@@ -27,6 +27,8 @@
     const chartHeight = height - 70;
     const labelFn = options.sampleLabels || ((id) => id);
     const isTaxonHighlighted = options.isTaxonHighlighted || null;
+    const tagForTaxon = options.tagForTaxon || null;
+    const colorForCategory = options.colorForCategory || null;
 
     container.innerHTML = '';
     const svg = document.createElementNS(STACKED_BAR_SVG_NS, 'svg');
@@ -49,12 +51,16 @@
         rect.setAttribute('width', barWidth);
         rect.setAttribute('height', segHeight);
         rect.setAttribute('fill', seg.name === 'Other' ? 'hsl(0, 0%, 60%)' : colorForTaxonName(seg.name));
+        const category = seg.name !== 'Other' && tagForTaxon && tagForTaxon(seg.name);
         if (isTaxonHighlighted && isTaxonHighlighted(seg.name)) {
           rect.setAttribute('stroke', 'var(--accent)');
           rect.setAttribute('stroke-width', '2');
+        } else if (category) {
+          rect.setAttribute('stroke', colorForCategory(category));
+          rect.setAttribute('stroke-width', '2');
         }
         const title = document.createElementNS(STACKED_BAR_SVG_NS, 'title');
-        title.textContent = `${seg.name}: ${seg.pct.toFixed(2)}%`;
+        title.textContent = `${seg.name}: ${seg.pct.toFixed(2)}%${category ? ` [${category}]` : ''}`;
         rect.appendChild(title);
         svg.appendChild(rect);
       });

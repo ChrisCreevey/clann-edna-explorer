@@ -55,6 +55,8 @@
       labelWidth = 160,
       showValues = false,
       isRowHighlighted = null,
+      tagForRow = null,
+      colorForCategory = null,
     } = spec;
 
     container.innerHTML = '';
@@ -109,15 +111,21 @@
       const y = headerHeight + groupStripHeight + r * cellHeight;
 
       const highlighted = isRowHighlighted && isRowHighlighted(label);
+      const category = tagForRow && tagForRow(label);
 
       const rowLabelText = document.createElementNS(HEATMAP_SVG_NS, 'text');
       rowLabelText.setAttribute('x', labelWidth - 6);
       rowLabelText.setAttribute('y', y + cellHeight / 2 + 3);
       rowLabelText.setAttribute('font-size', '10');
-      rowLabelText.setAttribute('fill', highlighted ? 'var(--accent)' : 'var(--text)');
-      rowLabelText.setAttribute('font-weight', highlighted ? 'bold' : 'normal');
+      rowLabelText.setAttribute('fill', highlighted ? 'var(--accent)' : category ? colorForCategory(category) : 'var(--text)');
+      rowLabelText.setAttribute('font-weight', highlighted || category ? 'bold' : 'normal');
       rowLabelText.setAttribute('text-anchor', 'end');
       rowLabelText.textContent = label;
+      if (category) {
+        const titleEl = document.createElementNS(HEATMAP_SVG_NS, 'title');
+        titleEl.textContent = category;
+        rowLabelText.appendChild(titleEl);
+      }
       svg.appendChild(rowLabelText);
 
       matrix[r].forEach((value, c) => {

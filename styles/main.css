@@ -760,3 +760,44 @@ table.rank-table tr.search-match td:first-child {
   gap: 0.5rem;
   margin-top: 0.5rem;
 }
+
+/* ---- Sample metadata + taxon category tags (Phase 8) ---- */
+
+.sample-metadata-section {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.sample-metadata-section h4,
+.tags-section h4 {
+  margin: 0 0 0.4rem 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.tag-badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  color: var(--text);
+}
+
+.tag-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.tag-chip {
+  padding: 0.1rem 0.5rem;
+  border: 1.5px solid;
+  border-radius: 999px;
+  font-size: 0.75rem;
+}

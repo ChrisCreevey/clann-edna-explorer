@@ -24,6 +24,8 @@
   const { renderStackedBarSVG } = window.ClannEDNA.stackedBar;
   const { parseExclusionList, matchesSearch } = window.ClannEDNA.filters;
   const { buildMicrobiomeAnalystExport } = window.ClannEDNA.microbiomeAnalystExport;
+  const { parseSampleMetadata, matchSummary: metadataMatchSummary } = window.ClannEDNA.sampleMetadata;
+  const { parseTaxonTagList, parseKeywordRules, resolveTag } = window.ClannEDNA.tags;
   const parsers = { parseBreport, parseBracken, parseGeneric, captureProvenance };
 
   const folderInput = document.getElementById('folder-input');
@@ -211,6 +213,37 @@
     };
   }
 
+  // Sample metadata (PLAN.md Phase 8) — a joined CSV/TSV keyed by sample
+  // ID. Purely a display/labeling concern like groups/filters: it never
+  // touches parsed sample data. Manual group assignment always takes
+  // precedence over pre-populating from a metadata column (sample.group
+  // Source tracks which one last set a sample's group).
+  let sampleMetadataFile = null; // {idColumnName, fieldNames, rowsById}
+  let metadataUploadError = '';
+  let groupPrepopulateColumn = '';
+
+  // Taxon category tagging (PLAN.md Phase 8) — a category is either an
+  // exact match from an uploaded taxid/name list or a substring match
+  // from a typed keyword rule (src/model/tags.js resolves precedence).
+  // Applied consistently across the rank table, Top-N chart, sunburst,
+  // Sankey, and comparison heatmaps/stacked bar, alongside (not instead
+  // of) the Phase 7 search highlight.
+  let taxonTagListText = '';
+  let keywordRulesText = '';
+
+  function currentTagResolver() {
+    const uploadedMap = parseTaxonTagList(taxonTagListText);
+    const keywordRules = parseKeywordRules(keywordRulesText);
+    if (uploadedMap.size === 0 && keywordRules.length === 0) return null;
+    return (name, taxid) => resolveTag(name, taxid, uploadedMap, keywordRules);
+  }
+
+  function colorForCategory(category) {
+    let hash = 0;
+    for (let i = 0; i < category.length; i++) hash = (hash * 31 + category.charCodeAt(i)) >>> 0;
+    return `hsl(${(hash % 360)}, 70%, 45%)`;
+  }
+
   async function loadSelected() {
     const rows = Array.from(tickList.querySelectorAll('li'));
     const grouped = new Map(); // sampleName -> {breport?, bracken?, generic?}
@@ -351,7 +384,14 @@
     const list = el('ul', { className: 'sample-group-list scroll-panel' });
     for (const sample of run.samples.values()) {
       const li = el('li', { className: 'sample-group-row' });
-      li.appendChild(el('span', { className: 'sample-group-name', text: sample.id }));
+      const nameLabel = sample.metadata ? `${sample.id} 🏷` : sample.id;
+      const nameSpan = el('span', { className: 'sample-group-name', text: nameLabel });
+      if (sample.metadata) {
+        nameSpan.title = Object.entries(sample.metadata)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join('\n');
+      }
+      li.appendChild(nameSpan);
 
       const select = el('select');
       select.appendChild(el('option', { value: '', text: '— unassigned —' }));
@@ -361,6 +401,7 @@
 
       select.addEventListener('change', () => {
         sample.group = select.value || null;
+        sample.groupSource = 'manual'; // manual assignment always wins over metadata pre-population
         renderResults();
       });
       li.appendChild(select);
@@ -378,7 +419,87 @@
     if (summary.excluded.length > 0) summaryParts.push(`excluded: ${summary.excluded.length}`);
     section.appendChild(el('p', { className: 'row-count', text: summaryParts.join(' · ') }));
 
+    section.appendChild(renderSampleMetadataSection());
+
     return section;
+  }
+
+  // ---- Sample metadata join + group pre-population (PLAN.md Phase 8) --
+
+  function renderSampleMetadataSection() {
+    const container = el('div', { className: 'sample-metadata-section' });
+    container.appendChild(el('h4', { text: 'Sample metadata' }));
+    container.appendChild(
+      el('p', {
+        className: 'viz-breadcrumb',
+        text: 'Upload a CSV/TSV: first column is the sample/barcode ID, any further columns are metadata fields. Matches are joined by exact ID — manual group assignment above always takes precedence over pre-populating from a column here.',
+      })
+    );
+
+    const fileInput = el('input', { type: 'file', accept: '.csv,.tsv,.txt' });
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        sampleMetadataFile = parseSampleMetadata(text);
+        metadataUploadError = '';
+        for (const sample of run.samples.values()) {
+          sample.metadata = sampleMetadataFile.rowsById.get(sample.id) || null;
+        }
+      } catch (err) {
+        metadataUploadError = `Could not read ${file.name}: ${err.message}`;
+        sampleMetadataFile = null;
+      }
+      renderResults();
+    });
+    container.appendChild(fileInput);
+
+    if (metadataUploadError) {
+      container.appendChild(el('p', { className: 'export-warnings', text: metadataUploadError }));
+    }
+
+    if (sampleMetadataFile && sampleMetadataFile.fieldNames.length > 0) {
+      const summary = metadataMatchSummary([...run.samples.keys()], sampleMetadataFile);
+      const parts = [`${summary.matched.length} of ${run.samples.size} loaded samples matched`];
+      if (summary.unmatchedSamples.length > 0) parts.push(`no metadata row for: ${summary.unmatchedSamples.join(', ')}`);
+      if (summary.unmatchedRows.length > 0) parts.push(`unused metadata rows: ${summary.unmatchedRows.join(', ')}`);
+      container.appendChild(el('p', { className: 'row-count', text: parts.join(' · ') }));
+
+      const prepopRow = el('div', { className: 'topn-controls' });
+      const columnSelect = el('select');
+      sampleMetadataFile.fieldNames.forEach((field) => {
+        const opt = el('option', { value: field, text: field });
+        opt.selected = field === groupPrepopulateColumn;
+        columnSelect.appendChild(opt);
+      });
+      const applyBtn = el('button', { type: 'button', text: 'Pre-populate groups from this column' });
+      applyBtn.addEventListener('click', () => {
+        groupPrepopulateColumn = columnSelect.value;
+        const values = new Set();
+        for (const sample of run.samples.values()) {
+          if (sample.groupSource === 'manual') continue; // never overwrite a manual choice
+          const row = sampleMetadataFile.rowsById.get(sample.id);
+          const value = row ? row[groupPrepopulateColumn] : '';
+          if (!value) continue;
+          sample.group = value;
+          sample.groupSource = 'metadata';
+          values.add(value);
+        }
+        // Make sure every newly-introduced group name is selectable in the
+        // dropdowns above, without clobbering whatever the student already typed.
+        const existing = currentGroupNames();
+        const merged = [...new Set([...existing, ...values])];
+        groupNamesText = merged.join(', ');
+        renderResults();
+      });
+      prepopRow.appendChild(el('label', { text: 'Column: ' }));
+      prepopRow.appendChild(columnSelect);
+      prepopRow.appendChild(applyBtn);
+      container.appendChild(prepopRow);
+    }
+
+    return container;
   }
 
   // ---- Global filters + search (PLAN.md Phase 7) -----------------------
@@ -464,6 +585,60 @@
     });
     searchRow.appendChild(searchInput);
     section.appendChild(searchRow);
+
+    return section;
+  }
+
+  // ---- Taxon category tagging (PLAN.md Phase 8) ------------------------
+
+  function renderTaxonTagsSection() {
+    if (run.samples.size === 0) return null;
+    const section = el('div', { className: 'viz-section tags-section' });
+    section.appendChild(el('h3', { text: 'Taxon category tags' }));
+    section.appendChild(
+      el('p', {
+        className: 'viz-breadcrumb',
+        text: 'Highlight taxa of interest (pathogens, indicator species, invasive species) consistently across the rank table, Top-N chart, sunburst, Sankey, and comparison heatmaps.',
+      })
+    );
+
+    const uploadRow = el('div', {});
+    uploadRow.appendChild(el('label', { text: 'Upload a taxon/taxid → category list (2 columns): ' }));
+    const fileInput = el('input', { type: 'file', accept: '.csv,.tsv,.txt' });
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      taxonTagListText = await file.text();
+      renderResults();
+    });
+    uploadRow.appendChild(fileInput);
+    section.appendChild(uploadRow);
+
+    section.appendChild(el('p', { className: 'viz-breadcrumb', text: 'Or type keyword rules, one per line: keyword => category' }));
+    const keywordInput = el('textarea', {
+      id: 'keyword-rules-input',
+      rows: '2',
+      placeholder: 'e.g. coli => Pathogen\nBos => Livestock contaminant',
+    });
+    keywordInput.value = keywordRulesText;
+    focusPreservingInput(keywordInput, 'keyword-rules-input', (v) => {
+      keywordRulesText = v;
+    });
+    section.appendChild(keywordInput);
+
+    const tagResolver = currentTagResolver();
+    if (tagResolver) {
+      const uploadedMap = parseTaxonTagList(taxonTagListText);
+      const rules = parseKeywordRules(keywordRulesText);
+      const categories = new Set([...uploadedMap.values(), ...rules.map((r) => r.category)]);
+      const legend = el('div', { className: 'tag-legend' });
+      categories.forEach((cat) => {
+        const chip = el('span', { className: 'tag-chip', text: cat });
+        chip.style.borderColor = colorForCategory(cat);
+        legend.appendChild(chip);
+      });
+      section.appendChild(legend);
+    }
 
     return section;
   }
@@ -591,9 +766,17 @@
 
     const tbody = el('tbody');
     const sorted = sortRows(rows, currentSort.column, currentSort.direction);
+    const tagResolver = currentTagResolver();
     sorted.forEach((row) => {
+      const nameCell = el('td', { text: row.name });
+      const category = tagResolver && tagResolver(row.name, row.taxid);
+      if (category) {
+        const badge = el('span', { className: 'tag-badge', text: category });
+        badge.style.borderColor = colorForCategory(category);
+        nameCell.appendChild(badge);
+      }
       const tr = el('tr', {}, [
-        el('td', { text: row.name }),
+        nameCell,
         el('td', { text: row.cladeReads.toLocaleString() }),
         el('td', { text: `${row.pctOfTotal.toFixed(3)}%` }),
       ]);
@@ -623,11 +806,15 @@
     const { top, other } = computeTopN(rows, topN);
     const maxReads = top.length > 0 ? top[0].cladeReads : 0;
     const bars = el('div', { className: 'bar-list scroll-panel' });
+    const tagResolver = currentTagResolver();
 
     const addBar = (label, reads, pct, cls, taxid) => {
       const highlighted = matchesSearch(label, taxid, globalSearchText);
       const barRow = el('div', { className: `bar-row ${cls || ''} ${highlighted ? 'search-match' : ''}` });
-      barRow.appendChild(el('span', { className: 'bar-label', text: label }));
+      const labelSpan = el('span', { className: 'bar-label', text: label });
+      const category = tagResolver && taxid !== undefined && tagResolver(label, taxid);
+      if (category) labelSpan.style.borderLeft = `3px solid ${colorForCategory(category)}`;
+      barRow.appendChild(labelSpan);
       const track = el('div', { className: 'bar-track' });
       const fill = el('div', { className: 'bar-fill' });
       fill.style.width = `${maxReads > 0 ? (100 * reads) / maxReads : 0}%`;
@@ -673,6 +860,8 @@
     renderSunburstSVG(host, hierarchyRoot, {
       size: 460,
       isHighlighted: (name, taxid) => matchesSearch(name, taxid, globalSearchText),
+      tagFor: currentTagResolver(),
+      colorForCategory,
       onFocusChange: (focus) => {
         breadcrumb.textContent =
           focus.depth <= 0
@@ -732,7 +921,13 @@
       const data = computeSankeyData(run.tree, sample.id, rankRange);
       const width = Math.max(600, host.clientWidth || 700);
       const layout = computeSankeyLayout(data, { width, height: 420 });
-      renderSankeySVG(host, layout, { width, height: 420, isHighlighted: (name, taxid) => matchesSearch(name, taxid, globalSearchText) });
+      renderSankeySVG(host, layout, {
+        width,
+        height: 420,
+        isHighlighted: (name, taxid) => matchesSearch(name, taxid, globalSearchText),
+        tagFor: currentTagResolver(),
+        colorForCategory,
+      });
     }
 
     startSelect.addEventListener('change', () => {
@@ -971,12 +1166,20 @@
     topNRow.appendChild(topNInput);
     section.appendChild(topNRow);
 
+    const tagResolver = currentTagResolver();
+
     const stackedHost = el('div', { className: 'stacked-bar-host' });
     section.appendChild(stackedHost);
     const stackedData = computeStackedComposition(run.tree, sampleIds, comparisonRank, stackedBarTopN, currentFilters());
     renderStackedBarSVG(stackedHost, stackedData, {
       sampleLabels: sampleGroupLabelFn(included),
       isTaxonHighlighted: (name) => matchesSearch(name, null, globalSearchText),
+      // No taxid available on stacked-composition rows (see comparison.js
+      // computeStackedComposition), so tagging here matches by name only —
+      // fine for the uploaded name/taxid list's name half and for keyword
+      // rules, just not for a tag uploaded purely by taxid.
+      tagForTaxon: tagResolver ? (name) => tagResolver(name, undefined) : null,
+      colorForCategory,
     });
 
     // Abundance heatmap
@@ -987,6 +1190,8 @@
       taxa: abundanceMatrix.taxa.slice(0, heatmapMaxRows),
       matrix: abundanceMatrix.matrix.slice(0, heatmapMaxRows),
     };
+    const taxidByName = new Map(cappedAbundance.taxa.map((t) => [t.name, t.taxid]));
+    const tagForRow = tagResolver ? (name) => tagResolver(name, taxidByName.get(name)) : null;
     section.appendChild(
       el('p', {
         className: 'row-count',
@@ -1001,6 +1206,8 @@
       matrix: cappedAbundance.matrix,
       colGroupColors,
       isRowHighlighted: (name) => matchesSearch(name, null, globalSearchText),
+      tagForRow,
+      colorForCategory,
     });
 
     // Presence/absence matrix
@@ -1025,6 +1232,8 @@
       colorFn: binaryColor,
       colGroupColors,
       isRowHighlighted: (name) => matchesSearch(name, null, globalSearchText),
+      tagForRow,
+      colorForCategory,
     });
 
     // Small multiples sunburst
@@ -1190,6 +1399,9 @@
 
     const filtersSection = renderFiltersSection();
     if (filtersSection) resultsPanel.appendChild(filtersSection);
+
+    const tagsSection = renderTaxonTagsSection();
+    if (tagsSection) resultsPanel.appendChild(tagsSection);
 
     const overviewSection = renderOverviewDashboard();
     if (overviewSection) resultsPanel.appendChild(overviewSection);

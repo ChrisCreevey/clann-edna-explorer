@@ -101,15 +101,19 @@ function renderSunburstSVG(container, root, options = {}) {
       const innerR = centerR + (seg.depth - 1) * ringWidth;
       const outerR = innerR + ringWidth;
       const highlighted = options.isHighlighted && options.isHighlighted(seg.node.name, seg.node.taxid);
+      const category = options.tagFor && options.tagFor(seg.node.name, seg.node.taxid);
       const path = document.createElementNS(SVG_NS, 'path');
       path.setAttribute('d', arcPath(cx, cy, innerR, outerR, seg.angleStart, seg.angleEnd));
       path.setAttribute('fill', colorForSunburstSeed(seg.node.taxid));
-      path.setAttribute('stroke', highlighted ? 'var(--accent)' : 'var(--bg)');
-      path.setAttribute('stroke-width', highlighted ? '2.5' : '0.5');
+      // Search highlight takes visual priority over a category tag when a
+      // segment matches both — a category colour would otherwise mask the
+      // active search, which is the more transient/deliberate action.
+      path.setAttribute('stroke', highlighted ? 'var(--accent)' : category ? options.colorForCategory(category) : 'var(--bg)');
+      path.setAttribute('stroke-width', highlighted || category ? '2.5' : '0.5');
       path.style.cursor = seg.node.children.length > 0 ? 'pointer' : 'default';
 
       const title = document.createElementNS(SVG_NS, 'title');
-      title.textContent = `${seg.node.name} (${seg.node.rank}) — ${seg.node.cladeReads.toLocaleString()} reads, ${seg.node.pctOfTotal.toFixed(2)}%`;
+      title.textContent = `${seg.node.name} (${seg.node.rank}) — ${seg.node.cladeReads.toLocaleString()} reads, ${seg.node.pctOfTotal.toFixed(2)}%${category ? ` [${category}]` : ''}`;
       path.appendChild(title);
 
       if (seg.node.children.length > 0) {

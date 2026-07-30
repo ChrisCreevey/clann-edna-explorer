@@ -33,6 +33,8 @@ function buildSample(sampleId, inputs, tree, parsers) {
     genericRows: null,
     sourceFiles: [],
     group: null, // display-layer only — see src/model/groups.js; null = unassigned
+    groupSource: null, // 'manual' | 'metadata' | null — manual always wins (Phase 8: metadata pre-population)
+    metadata: null, // sample metadata row, if a matching upload was joined — see src/parsers/sample-metadata.js
   };
 
   if (inputs.breport) {
