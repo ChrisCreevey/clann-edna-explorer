@@ -1,2 +1,8 @@
 .DS_Store
 *.log
+
+# Original example data and design brief provided for development —
+# not part of the shipped app (see examples/ and test/fixtures/ for the
+# trimmed copies actually used by the site and test suite).
+/COI_bracken_outputs/
+/clann-edna-explorer-brief.md
