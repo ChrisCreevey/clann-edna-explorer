@@ -1,3 +1,6 @@
+(function () {
+  'use strict';
+
 // Folder-based loading (PLAN.md §1 "Folder-based loading"). Feature-detects
 // the File System Access API (Chromium) and falls back to a plain
 // <input type="file" webkitdirectory"> element everywhere else. Both paths
@@ -46,3 +49,4 @@ if (typeof window !== 'undefined') {
   window.ClannEDNA = window.ClannEDNA || {};
   window.ClannEDNA.folderLoader = folderLoaderExports;
 }
+})();

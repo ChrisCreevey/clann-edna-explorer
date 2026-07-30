@@ -1,3 +1,6 @@
+(function () {
+  'use strict';
+
 // Content-based format detection for Kraken2/Bracken input files.
 // Never trusts file names/extensions — reads only the first N lines of content.
 // See PLAN.md §1 "Content-based format detection" for the rules this implements.
@@ -180,3 +183,4 @@ if (typeof window !== 'undefined') {
   window.ClannEDNA = window.ClannEDNA || {};
   window.ClannEDNA.sniff = sniffExports;
 }
+})();

@@ -1,3 +1,6 @@
+(function () {
+  'use strict';
+
 // Parser for Kraken-style .breport files: one row per taxonomy tree node,
 // hierarchy encoded via leading-space indentation on the name column (2
 // spaces per depth level — confirmed against real barcode39-45 example
@@ -75,3 +78,4 @@ if (typeof window !== 'undefined') {
   window.ClannEDNA = window.ClannEDNA || {};
   window.ClannEDNA.breport = breportExports;
 }
+})();

@@ -1,3 +1,6 @@
+(function () {
+  'use strict';
+
 // Rank-by-rank breakdown table and Top-N bucketing for a single tree-backed
 // sample, plus the flat-row equivalent for generic-format samples.
 
@@ -101,3 +104,4 @@ if (typeof window !== 'undefined') {
   window.ClannEDNA = window.ClannEDNA || {};
   window.ClannEDNA.rankTable = rankTableExports;
 }
+})();

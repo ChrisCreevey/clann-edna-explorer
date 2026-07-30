@@ -1,3 +1,6 @@
+(function () {
+  'use strict';
+
 // Read-summary statistics for a single tree-backed sample: total reads,
 // classified vs unclassified, and (when a .bracken file was also loaded)
 // raw Kraken-assigned vs Bracken-re-estimated counts at the leaf rank.
@@ -53,3 +56,4 @@ if (typeof window !== 'undefined') {
   window.ClannEDNA = window.ClannEDNA || {};
   window.ClannEDNA.summary = summaryExports;
 }
+})();

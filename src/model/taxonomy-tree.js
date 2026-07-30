@@ -1,3 +1,6 @@
+(function () {
+  'use strict';
+
 // Flat, typed-array-backed taxonomy tree keyed by taxid, shared across all
 // samples in a run (see PLAN.md §2 data model). Avoids one JS object per
 // node so a multi-sample run stays cheap in memory.
@@ -90,3 +93,4 @@ if (typeof window !== 'undefined') {
   window.ClannEDNA = window.ClannEDNA || {};
   window.ClannEDNA.taxonomyTree = taxonomyTreeExports;
 }
+})();

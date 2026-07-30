@@ -1,3 +1,6 @@
+(function () {
+  'use strict';
+
 // Builds a Sample from parsed file(s) and attaches its data into the
 // shared TaxonomyTree (see PLAN.md §2 data model). A sample may have a
 // .breport, a .bracken, both, or a single generic-format file — never more
@@ -60,3 +63,4 @@ if (typeof window !== 'undefined') {
   window.ClannEDNA = window.ClannEDNA || {};
   window.ClannEDNA.sample = sampleExports;
 }
+})();

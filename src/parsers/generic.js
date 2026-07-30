@@ -1,3 +1,6 @@
+(function () {
+  'use strict';
+
 // Best-effort generic tab-delimited parser for non-Kraken classifier output
 // (Kaiju, Centrifuge, MetaPhlAn, ...). No taxonomic hierarchy is assumed —
 // produces a flat list of {name, abundance} rows keyed by row index rather
@@ -48,3 +51,4 @@ if (typeof window !== 'undefined') {
   window.ClannEDNA = window.ClannEDNA || {};
   window.ClannEDNA.generic = genericExports;
 }
+})();

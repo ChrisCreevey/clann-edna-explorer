@@ -1,3 +1,6 @@
+(function () {
+  'use strict';
+
 // Parser for .bracken files: tab-delimited, one row per leaf-rank taxon,
 // with a literal header row.
 //
@@ -85,3 +88,4 @@ if (typeof window !== 'undefined') {
   window.ClannEDNA = window.ClannEDNA || {};
   window.ClannEDNA.bracken = brackenExports;
 }
+})();

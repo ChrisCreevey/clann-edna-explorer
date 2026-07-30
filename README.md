@@ -17,10 +17,11 @@ plan and Phase 1 investigation findings.
 
 ## Status
 
-Phase 1 (investigation, data model, parsers, folder-based loading) and
+Phase 1 (investigation, data model, parsers, folder-based loading),
 Phase 2 (single-sample parsing, read-summary card, rank-by-rank table,
-Top-N bar chart, generic fallback with manual column mapping) are built.
-Later phases (Krona/Sankey visualisation, multi-sample comparison,
+Top-N bar chart, generic fallback with manual column mapping), and Phase 3
+(Krona-style zoomable sunburst, Pavian-style Sankey diagram with a
+configurable rank cutoff) are built. Later phases (multi-sample comparison,
 diversity/similarity, exports) are not yet built — see `PLAN.md` §3.
 
 ## Running locally
@@ -51,9 +52,13 @@ styles/main.css        theme-aware (light/dark) stylesheet
 src/parsers/           .bracken / .breport / generic parsers, content sniffer,
                         provenance capture, folder loader
 src/model/              shared taxid-keyed taxonomy tree, sample builder,
-                        read-summary stats, rank-table/Top-N computation
+                        read-summary stats, rank-table/Top-N computation,
+                        nested-hierarchy builder for the visualisations
+src/viz/                sunburst (Krona-style) and Sankey (Pavian-style)
+                        layout math + SVG rendering
 src/app.js              UI wiring (folder loading, tick-list, sample loading,
-                        summary card, rank table, Top-N chart, theme toggle)
+                        summary card, rank table, Top-N chart, sunburst,
+                        Sankey, theme toggle)
 test/                    zero-dependency test harness + tests
 test/fixtures/           real example files used by the test suite
 examples/                trimmed example run for the hosted demo
@@ -69,6 +74,36 @@ complementary views of the same Bracken re-estimated counts, not
 independent pre/post datasets. See `PLAN.md` §1 for the full investigation
 writeup, including the content-based format-detection rules and the
 (currently unconfirmed) status of Galaxy-exported header/provenance blocks.
+
+## Adding a new src/ file
+
+Every file under `src/` is a plain (non-module) `<script src>` include, not
+an ES module — there's no bundler. All of `src/`'s top-level declarations
+therefore share **one JS global scope** across the whole page. To avoid
+`let`/`const`/`function` name collisions between files (e.g. two files both
+declaring a top-level `SVG_NS` or destructuring the same import name), wrap
+every new file's body in an IIFE:
+
+```js
+(function () {
+  'use strict';
+
+  // ... file contents ...
+
+  const xExports = { ... };
+  if (typeof module !== 'undefined' && module.exports) module.exports = xExports;
+  if (typeof window !== 'undefined') {
+    window.ClannEDNA = window.ClannEDNA || {};
+    window.ClannEDNA.x = xExports;
+  }
+})();
+```
+
+Only the `window.ClannEDNA.<name>` export is visible to other files; expose
+functions through that object, not as bare globals. `src/app.js` already
+follows this pattern. (Every existing file was retrofitted with this
+wrapper after a real collision — see git history around the Phase 3 commit
+— so don't skip it for new files.)
 
 ## Performance ceiling
 

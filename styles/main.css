@@ -421,3 +421,54 @@ table.rank-table td:nth-child(3) {
   color: var(--text-muted);
   text-align: right;
 }
+
+/* ---- Sunburst / Sankey (Phase 3) ---- */
+
+.viz-section {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.viz-section h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.viz-breadcrumb {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  margin: 0 0 0.5rem 0;
+}
+
+.sunburst-host {
+  display: flex;
+  justify-content: center;
+}
+
+.sunburst-host svg path {
+  transition: opacity 0.1s;
+}
+
+.sunburst-host svg path:hover {
+  opacity: 0.8;
+}
+
+.sankey-controls {
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.sankey-controls select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+}
+
+.sankey-host {
+  overflow-x: auto;
+}

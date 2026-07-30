@@ -1,3 +1,6 @@
+(function () {
+  'use strict';
+
 // Header/provenance metadata capture (tool version, database, original
 // sample name, command invocation) from leading comment lines.
 //
@@ -43,3 +46,4 @@ if (typeof window !== 'undefined') {
   window.ClannEDNA = window.ClannEDNA || {};
   window.ClannEDNA.provenance = provenanceExports;
 }
+})();

@@ -13,6 +13,9 @@
   const { parseBracken } = window.ClannEDNA.bracken;
   const { parseGeneric } = window.ClannEDNA.generic;
   const { captureProvenance } = window.ClannEDNA.provenance;
+  const { buildHierarchyTree } = window.ClannEDNA.hierarchy;
+  const { renderSunburstSVG } = window.ClannEDNA.sunburst;
+  const { computeSankeyData, computeSankeyLayout, renderSankeySVG } = window.ClannEDNA.sankey;
   const parsers = { parseBreport, parseBracken, parseGeneric, captureProvenance };
 
   const folderInput = document.getElementById('folder-input');
@@ -434,6 +437,96 @@
     chartHost.appendChild(renderTopNChart(rows));
   }
 
+  // ---- Sunburst (Krona-style) -----------------------------------------
+
+  function renderSunburstSection(sample) {
+    const hierarchyRoot = buildHierarchyTree(run.tree, sample.id);
+    if (!hierarchyRoot) return null;
+
+    const section = el('div', { className: 'viz-section' });
+    section.appendChild(el('h3', { text: 'Taxonomic sunburst' }));
+    const breadcrumb = el('p', { className: 'viz-breadcrumb', text: 'root — click a segment to zoom in, click the centre to zoom out' });
+    section.appendChild(breadcrumb);
+    const host = el('div', { className: 'sunburst-host' });
+    section.appendChild(host);
+
+    renderSunburstSVG(host, hierarchyRoot, {
+      size: 460,
+      onFocusChange: (focus) => {
+        breadcrumb.textContent =
+          focus.depth <= 0
+            ? 'root — click a segment to zoom in, click the centre to zoom out'
+            : `${focus.name} (${focus.cladeReads.toLocaleString()} reads) — click a segment to zoom in, click the centre to zoom out`;
+      },
+    });
+
+    return section;
+  }
+
+  // ---- Sankey (Pavian-style) --------------------------------------------
+
+  let sankeyStartRank = null;
+  let sankeyEndRank = null;
+
+  function renderSankeySection(sample) {
+    const ranks = computeAvailableRanks(run.tree, sample.id);
+    if (ranks.length < 2) return null;
+
+    if (!sankeyStartRank || !ranks.includes(sankeyStartRank)) sankeyStartRank = ranks[0];
+    if (!sankeyEndRank || !ranks.includes(sankeyEndRank)) sankeyEndRank = ranks[ranks.length - 1];
+
+    const section = el('div', { className: 'viz-section' });
+    section.appendChild(el('h3', { text: 'Sankey: read flow through ranks' }));
+
+    const controls = el('div', { className: 'sankey-controls' });
+    const startSelect = el('select');
+    const endSelect = el('select');
+    ranks.forEach((r) => {
+      const startOpt = el('option', { value: r, text: r });
+      startOpt.selected = r === sankeyStartRank;
+      startSelect.appendChild(startOpt);
+      const endOpt = el('option', { value: r, text: r });
+      endOpt.selected = r === sankeyEndRank;
+      endSelect.appendChild(endOpt);
+    });
+    controls.appendChild(el('label', { text: 'From rank: ' }));
+    controls.appendChild(startSelect);
+    controls.appendChild(el('label', { text: ' to rank: ' }));
+    controls.appendChild(endSelect);
+    section.appendChild(controls);
+
+    const host = el('div', { className: 'sankey-host' });
+    section.appendChild(host);
+
+    function draw() {
+      const startIdx = ranks.indexOf(sankeyStartRank);
+      const endIdx = ranks.indexOf(sankeyEndRank);
+      const [lo, hi] = startIdx <= endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
+      const rankRange = ranks.slice(lo, hi + 1);
+      if (rankRange.length < 2) {
+        host.innerHTML = '';
+        host.appendChild(el('p', { className: 'empty-state', text: 'Pick two different ranks to draw a flow diagram.' }));
+        return;
+      }
+      const data = computeSankeyData(run.tree, sample.id, rankRange);
+      const width = Math.max(600, host.clientWidth || 700);
+      const layout = computeSankeyLayout(data, { width, height: 420 });
+      renderSankeySVG(host, layout, { width, height: 420 });
+    }
+
+    startSelect.addEventListener('change', () => {
+      sankeyStartRank = startSelect.value;
+      draw();
+    });
+    endSelect.addEventListener('change', () => {
+      sankeyEndRank = endSelect.value;
+      draw();
+    });
+
+    draw();
+    return section;
+  }
+
   function renderResults() {
     if (run.samples.size === 0) return;
     resultsPanel.innerHTML = '';
@@ -446,6 +539,12 @@
     resultsPanel.appendChild(renderSummaryCard(sample));
 
     if (sample.kind !== 'generic') {
+      const sunburstSection = renderSunburstSection(sample);
+      if (sunburstSection) resultsPanel.appendChild(sunburstSection);
+
+      const sankeySection = renderSankeySection(sample);
+      if (sankeySection) resultsPanel.appendChild(sankeySection);
+
       const rankControls = renderRankControls(sample);
       if (rankControls) resultsPanel.appendChild(rankControls);
     }
