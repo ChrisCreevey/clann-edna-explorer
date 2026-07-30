@@ -42,9 +42,20 @@ groups from this column" that never overwrites a manual group choice;
 taxon category tagging via an uploaded taxid/name → category list and/or
 typed keyword rules, applied consistently across the rank table, Top-N
 chart, sunburst, Sankey, and comparison heatmaps/stacked bar) is also
-built. What's left of Phase 9 (plain CSV/diversity exports, diagram
-PNG/SVG export, BLAST Explorer cross-link, About/FAQ/footer) is not yet
-built — see `PLAN.md` §3.
+built. Phase 9 is now complete: every diagram (sunburst, Sankey, heatmaps,
+stacked bar) exports as a self-contained SVG or PNG (CSS custom properties
+resolved to concrete colours at export time, so the file looks right
+outside this page too); the filtered rank table, the full merged
+abundance matrix, and the diversity/similarity summaries export as CSV
+with the current group assignment included as a column; a per-taxon
+detail card (click any rank-table row) shows the full lineage and
+abundance across every loaded sample, with a cross-link to
+[Clann BLAST Explorer](https://chriscreevey.github.io/clann-blast-explorer/)
+to verify an unexpected call; and the site now has full meta tags
+(description, keywords, canonical, Open Graph, Twitter card,
+WebApplication + FAQPage JSON-LD), an About & FAQ section, and a footer
+matching the rest of the suite's convention (Feedback/GitHub/Star links).
+See `PLAN.md` §3 for the full phase breakdown.
 
 The exclusion list and abundance threshold apply to every rank-table-
 derived view (single-sample table, Top-N chart, comparison heatmaps,
@@ -100,12 +111,16 @@ src/model/              shared taxid-keyed taxonomy tree, sample builder,
                         exclusion-list filtering + search matching
                         (filters.js), MicrobiomeAnalyst 3-file structured
                         export (microbiome-analyst-export.js), taxon
-                        category tagging (tags.js)
+                        category tagging (tags.js), plain CSV exports
+                        (csv-export.js), per-taxon lineage/cross-sample
+                        detail (taxon-detail.js)
 src/viz/                sunburst (Krona-style), Sankey (Pavian-style),
                         generic heatmap (heatmap.js — abundance,
                         presence/absence, and similarity all reuse it),
                         and stacked composition bar chart, all layout math
-                        + SVG rendering
+                        + SVG rendering; shared SVG/PNG diagram export
+                        (svg-export.js) that bakes resolved CSS custom
+                        properties into the exported file so it's portable
 src/app.js              UI wiring: folder loading, tick-list, sample
                         loading, sample groups, overview dashboard,
                         multi-sample comparison, per-sample summary card,

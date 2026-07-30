@@ -3,9 +3,56 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Clann eDNA Explorer</title>
-  <meta name="description" content="Browser-only explorer for Kraken2/Bracken eDNA metabarcoding classification results — part of the Clann suite." />
+  <title>Clann eDNA Explorer — Kraken2/Bracken eDNA metabarcoding explorer</title>
+  <meta name="description" content="Free, browser-based explorer for Kraken2/Bracken eDNA metabarcoding results. Load .bracken/.breport files, explore Krona-style sunbursts and Pavian-style Sankey diagrams, compare samples by group, and export to MicrobiomeAnalyst. Nothing is uploaded; everything runs in your browser." />
+  <meta name="keywords" content="eDNA explorer, metabarcoding, Kraken2, Bracken, bracken report, taxonomic classification, Krona chart, Sankey diagram, MicrobiomeAnalyst, metagenomics, microbiome analysis, online eDNA tool" />
+  <meta name="author" content="CreeveyLab" />
+  <link rel="canonical" href="https://chriscreevey.github.io/clann-edna-explorer/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Clann eDNA Explorer" />
+  <meta property="og:title" content="Clann eDNA Explorer — Kraken2/Bracken eDNA metabarcoding explorer" />
+  <meta property="og:description" content="Load Kraken2/Bracken output, explore Krona-style sunbursts and Sankey diagrams, compare samples by group, and export to MicrobiomeAnalyst — all in your browser." />
+  <meta property="og:url" content="https://chriscreevey.github.io/clann-edna-explorer/" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Clann eDNA Explorer — Kraken2/Bracken eDNA metabarcoding explorer" />
+  <meta name="twitter:description" content="Load Kraken2/Bracken output, explore Krona-style sunbursts and Sankey diagrams, compare samples by group, and export to MicrobiomeAnalyst — all in your browser." />
   <link rel="stylesheet" href="styles/main.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Clann eDNA Explorer",
+    "url": "https://chriscreevey.github.io/clann-edna-explorer/",
+    "applicationCategory": "BioinformaticsApplication",
+    "operatingSystem": "Any (modern web browser)",
+    "browserRequirements": "Requires JavaScript",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "description": "Free browser-based explorer for Kraken2/Bracken eDNA metabarcoding classification results, with Krona-style sunbursts, Pavian-style Sankey diagrams, multi-sample comparison, and a MicrobiomeAnalyst-format export.",
+    "keywords": "eDNA, metabarcoding, Kraken2, Bracken, Krona, Sankey, MicrobiomeAnalyst, metagenomics",
+    "author": { "@type": "Organization", "name": "CreeveyLab", "url": "https://www.creeveylab.org/" },
+    "codeRepository": "https://github.com/ChrisCreevey/clann-edna-explorer"
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      { "@type": "Question", "name": "What input files does Clann eDNA Explorer need?",
+        "acceptedAnswer": { "@type": "Answer", "text": "A Kraken2/Bracken .breport (full taxonomic hierarchy) and/or .bracken (leaf-rank re-estimated counts) file per sample. Files are identified by their content, not their name or extension, so Galaxy exports with generic filenames still work. A generic tab-delimited fallback parser handles output from other classifiers on a best-effort basis." } },
+      { "@type": "Question", "name": "Is my data uploaded to a server?",
+        "acceptedAnswer": { "@type": "Answer", "text": "No. Everything runs client-side in your browser — parsing, visualisation, and every export happen locally. Your classification results never leave your computer." } },
+      { "@type": "Question", "name": "Can I compare multiple samples?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Load a full run, assign samples to groups, and the overview dashboard, stacked composition chart, abundance heatmap, presence/absence matrix, diversity summary, and Bray-Curtis/Jaccard similarity matrix all update to match — grouped, coloured, and recalculated live." } },
+      { "@type": "Question", "name": "Can I export results for MicrobiomeAnalyst?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. The MicrobiomeAnalyst export builds the abundance table, taxonomy mapping, and metadata files to their documented format exactly, reflecting exactly the samples, rank, and filters currently shown in the comparison view." } },
+      { "@type": "Question", "name": "Can I export the diagrams?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. The sunburst, Sankey diagram, heatmaps, and stacked composition chart can each be exported as SVG (vector, edit it further) or PNG (raster, drop straight into a slide or report)." } },
+      { "@type": "Question", "name": "Is Clann eDNA Explorer free?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes, it is free and open source (GPL-2.0), developed by CreeveyLab. Use it online or clone the repository and host it yourself." } }
+    ]
+  }
+  </script>
 </head>
 <body>
   <header class="site-header">
@@ -14,6 +61,7 @@
       <a href="https://chriscreevey.github.io/clann-tree-viewer/">Tree Viewer</a>
       <a href="https://chriscreevey.github.io/clann-blast-explorer/">BLAST Explorer</a>
       <a href="https://chriscreevey.github.io/clann-pangenome-explorer/">Pangenome Explorer</a>
+      <a href="#about">About &amp; FAQ</a>
       <button id="theme-toggle" type="button">Theme: Auto</button>
     </nav>
   </header>
@@ -40,9 +88,98 @@
     </section>
   </main>
 
+  <section id="about" class="about">
+    <h2>About Clann eDNA Explorer</h2>
+    <p>
+      <strong>Clann eDNA Explorer</strong> is a free, open-source tool for exploring taxonomic classification
+      results from eDNA metabarcoding and metagenomic studies. Point it at a folder of
+      <strong>Kraken2/Bracken</strong> output — <code>.breport</code> and/or <code>.bracken</code> files, any
+      names, identified by content rather than filename — and it builds per-sample summaries, a Krona-style
+      zoomable sunburst, a Pavian-style Sankey diagram, and, once a full run is loaded, group-aware multi-sample
+      comparison: a stacked composition chart, an abundance heatmap, a presence/absence matrix, a diversity
+      summary, and a Bray-Curtis/Jaccard sample-similarity matrix.
+    </p>
+    <p>
+      A run can be filtered live by minimum abundance or a host/contaminant exclusion list, taxa can be searched
+      and tagged by category, and sample metadata can be joined in to label samples or pre-populate groups.
+      Every diagram exports as SVG or PNG, the filtered taxon table and diversity/similarity summaries export as
+      CSV, and the whole comparison exports to <strong>MicrobiomeAnalyst</strong>'s documented data format for
+      formal statistical analysis downstream. Nothing is uploaded — parsing, visualisation, and every export run
+      entirely in your browser.
+    </p>
+    <p>
+      It's the fourth tool in the <a href="https://chriscreevey.github.io/">Clann suite</a>, alongside
+      <a href="https://chriscreevey.github.io/clann-tree-viewer/">Clann Tree Viewer</a>,
+      <a href="https://chriscreevey.github.io/clann-blast-explorer/">Clann BLAST Explorer</a>, and
+      <a href="https://chriscreevey.github.io/clann-pangenome-explorer/">Clann Pangenome Explorer</a>. A taxon
+      flagged here as unexpected or worth double-checking can be verified by pulling a representative read and
+      BLASTing it in Clann BLAST Explorer — click any row in a rank table for that link.
+    </p>
+
+    <h2>Frequently asked questions</h2>
+
+    <h3>What input files does it need?</h3>
+    <p>
+      A Kraken2/Bracken <code>.breport</code> (full taxonomic hierarchy) and/or <code>.bracken</code> (leaf-rank
+      re-estimated counts) file per sample. Files are identified by their content, not their name or extension,
+      so a Galaxy export with a generic filename still loads correctly. A generic tab-delimited fallback parser
+      handles output from other classifiers (Kaiju, Centrifuge, MetaPhlAn, ...) on a best-effort basis, with
+      manual column mapping if auto-detection can't confirm the shape.
+    </p>
+
+    <h3>Is my data uploaded to a server?</h3>
+    <p>
+      No. Everything — parsing, every visualisation, and every export — runs client-side in your browser. Your
+      classification results never leave your computer. You can save the page and use it offline, or host it
+      yourself.
+    </p>
+
+    <h3>Can I compare multiple samples?</h3>
+    <p>
+      Yes. Load a full run, type a comma-separated list of group names, and assign each sample to one from a
+      dropdown (with an Exclude option that drops a sample from every calculation without unloading it). The
+      overview dashboard, stacked composition chart, abundance heatmap, presence/absence matrix, diversity
+      summary, and sample-similarity matrix all recalculate live to match — grouped, coloured, and ordered by
+      group throughout.
+    </p>
+
+    <h3>Can I export results for MicrobiomeAnalyst?</h3>
+    <p>
+      Yes. The MicrobiomeAnalyst export builds the abundance table, taxonomy mapping, and metadata files to
+      <a href="https://www.microbiomeanalyst.ca/docs/DataFormat.xhtml" target="_blank" rel="noopener">their
+      documented format</a> exactly, reflecting exactly the samples, rank, and filters currently shown in the
+      comparison view — so what you exported is always what you were looking at.
+    </p>
+
+    <h3>Can I export the diagrams and tables?</h3>
+    <p>
+      Yes. The sunburst, Sankey diagram, heatmaps, and stacked composition chart each export as SVG (vector,
+      edit it further) or PNG (raster, drop into a slide or report). The filtered rank table, the merged
+      abundance matrix, and the diversity/similarity summaries all export as CSV, with the current group
+      assignment included as a column so the file is self-describing without this tool.
+    </p>
+
+    <h3>Is it free?</h3>
+    <p>
+      Yes — Clann eDNA Explorer is free and open source (GPL-2.0), developed by
+      <a href="https://www.creeveylab.org/" target="_blank" rel="noopener">CreeveyLab</a>. Use it online or clone
+      the <a href="https://github.com/chriscreevey/clann-edna-explorer" target="_blank" rel="noopener">repository</a>
+      and host it yourself.
+    </p>
+  </section>
+
   <footer class="site-footer">
-    <span>Clann eDNA Explorer — part of the <a href="https://chriscreevey.github.io/">Clann suite</a>. GPL-2.0.</span>
-    <span><a href="https://github.com/chriscreevey/clann-edna-explorer">Source on GitHub</a></span>
+    <span class="foot-l">
+      <strong>Clann eDNA Explorer</strong><span class="sep"> · </span>developed by
+      <a href="https://www.creeveylab.org/" target="_blank" rel="noopener">CreeveyLab</a>
+      <span class="sep"> · </span>part of the <a href="https://chriscreevey.github.io/">Clann suite</a>
+      <span class="sep"> · </span>GPL-2.0
+    </span>
+    <span class="foot-r">
+      <a href="https://github.com/chriscreevey/clann-edna-explorer/issues/new/choose" target="_blank" rel="noopener" title="Suggest a feature or report a problem (opens GitHub — a free account is needed to post)">Feedback</a>
+      <a href="https://github.com/chriscreevey/clann-edna-explorer" target="_blank" rel="noopener" title="Source code on GitHub">GitHub</a>
+      <a href="https://github.com/chriscreevey/clann-edna-explorer" target="_blank" rel="noopener" title="Like it? Star the repository on GitHub">★ Star on GitHub</a>
+    </span>
   </footer>
 
   <script src="src/parsers/sniff.js"></script>
@@ -64,10 +201,13 @@
   <script src="src/model/comparison.js"></script>
   <script src="src/model/similarity.js"></script>
   <script src="src/model/microbiome-analyst-export.js"></script>
+  <script src="src/model/csv-export.js"></script>
+  <script src="src/model/taxon-detail.js"></script>
   <script src="src/viz/sunburst.js"></script>
   <script src="src/viz/sankey.js"></script>
   <script src="src/viz/heatmap.js"></script>
   <script src="src/viz/stacked-bar.js"></script>
+  <script src="src/viz/svg-export.js"></script>
   <script src="src/app.js"></script>
 </body>
 </html>

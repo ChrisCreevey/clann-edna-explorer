@@ -26,6 +26,11 @@
   const { buildMicrobiomeAnalystExport } = window.ClannEDNA.microbiomeAnalystExport;
   const { parseSampleMetadata, matchSummary: metadataMatchSummary } = window.ClannEDNA.sampleMetadata;
   const { parseTaxonTagList, parseKeywordRules, resolveTag } = window.ClannEDNA.tags;
+  const { createExportButtons } = window.ClannEDNA.svgExport;
+  const { rankTableToCsv, abundanceMatrixToCsv, diversitySummaryToCsv, distanceMatrixToCsv } = window.ClannEDNA.csvExport;
+  const { computeTaxonDetail } = window.ClannEDNA.taxonDetail;
+
+  const BLAST_EXPLORER_URL = 'https://chriscreevey.github.io/clann-blast-explorer/';
   const parsers = { parseBreport, parseBracken, parseGeneric, captureProvenance };
 
   const folderInput = document.getElementById('folder-input');
@@ -297,6 +302,7 @@
   let currentRank = null;
   let currentSearch = '';
   let currentSort = { column: 'cladeReads', direction: 'desc' };
+  const expandedTaxids = new Set(); // rank-table rows with their detail card open
   let topN = 15;
 
   function el(tag, props = {}, children = []) {
@@ -744,6 +750,69 @@
     { key: 'pctOfTotal', label: '% of total' },
   ];
 
+  // ---- Per-taxon detail card + BLAST Explorer cross-link (Phase 9) -----
+  //
+  // "taxa flagged as unexpected or worth verifying here could have
+  // representative reads pulled and BLASTed in Clann BLAST Explorer to
+  // confirm identification" — this app has no raw reads (only
+  // classification results), so the link is necessarily a jumping-off
+  // point to the other tool rather than a pre-filled query.
+  function renderTaxonDetailCard(taxid, tagResolver) {
+    const detail = computeTaxonDetail(run.tree, taxid, [...run.samples.keys()]);
+    const card = el('div', { className: 'taxon-detail-card' });
+    if (!detail) {
+      card.appendChild(el('p', { className: 'empty-state', text: 'No detail available for this taxon.' }));
+      return card;
+    }
+
+    const category = tagResolver && tagResolver(detail.name, detail.taxid);
+    const titleRow = el('div', { className: 'taxon-detail-title' });
+    titleRow.appendChild(el('strong', { text: `${detail.name} (taxid ${detail.taxid}, rank ${detail.rank})` }));
+    if (category) {
+      const badge = el('span', { className: 'tag-badge', text: category });
+      badge.style.borderColor = colorForCategory(category);
+      titleRow.appendChild(badge);
+    }
+    card.appendChild(titleRow);
+
+    card.appendChild(el('p', { className: 'taxon-detail-lineage', text: detail.lineage.map((n) => n.name).join(' › ') }));
+
+    const sampleTable = el('table', { className: 'rank-table' });
+    sampleTable.appendChild(
+      el('thead', {}, [el('tr', {}, ['Sample', 'Group', 'Reads', '% of total'].map((h) => el('th', { text: h })))])
+    );
+    const sampleBody = el('tbody');
+    detail.perSample.forEach((s) => {
+      const sample = run.samples.get(s.sampleId);
+      sampleBody.appendChild(
+        el('tr', {}, [
+          el('td', { text: s.sampleId }),
+          el('td', { text: (sample && sample.group) || '' }),
+          el('td', { text: s.cladeReads.toLocaleString() }),
+          el('td', { text: `${s.pctOfTotal.toFixed(3)}%` }),
+        ])
+      );
+    });
+    sampleTable.appendChild(sampleBody);
+    card.appendChild(el('div', { className: 'table-wrap' }, [sampleTable]));
+
+    const blastLink = el('a', {
+      href: BLAST_EXPLORER_URL,
+      target: '_blank',
+      rel: 'noopener',
+      text: 'Verify in Clann BLAST Explorer ↗',
+    });
+    card.appendChild(
+      el('p', { className: 'viz-breadcrumb' }, [
+        document.createTextNode('This tool has no raw reads to pass along — open '),
+        blastLink,
+        document.createTextNode(' and BLAST a representative read yourself to confirm this identification.'),
+      ])
+    );
+
+    return card;
+  }
+
   function renderTable(rows) {
     const table = el('table', { className: 'rank-table' });
     const thead = el('thead');
@@ -781,7 +850,25 @@
         el('td', { text: `${row.pctOfTotal.toFixed(3)}%` }),
       ]);
       if (matchesSearch(row.name, row.taxid, globalSearchText)) tr.classList.add('search-match');
+
+      if (row.taxid !== undefined) {
+        tr.classList.add('expandable-row');
+        tr.title = 'Click for full lineage, cross-sample abundance, and a BLAST Explorer link';
+        tr.addEventListener('click', () => {
+          if (expandedTaxids.has(row.taxid)) expandedTaxids.delete(row.taxid);
+          else expandedTaxids.add(row.taxid);
+          renderTableAndChart();
+        });
+      }
       tbody.appendChild(tr);
+
+      if (row.taxid !== undefined && expandedTaxids.has(row.taxid)) {
+        const detailTr = el('tr', { className: 'taxon-detail-row' });
+        const detailTd = el('td', { colspan: '3' });
+        detailTd.appendChild(renderTaxonDetailCard(row.taxid, tagResolver));
+        detailTr.appendChild(detailTd);
+        tbody.appendChild(detailTr);
+      }
     });
     table.appendChild(tbody);
 
@@ -869,6 +956,7 @@
             : `${focus.name} (${focus.cladeReads.toLocaleString()} reads) — click a segment to zoom in, click the centre to zoom out`;
       },
     });
+    section.appendChild(createExportButtons(() => host, `${sample.id}-sunburst`));
 
     return section;
   }
@@ -940,6 +1028,7 @@
     });
 
     draw();
+    section.appendChild(createExportButtons(() => host, `${sample.id}-sankey`));
     return section;
   }
 
@@ -1181,6 +1270,7 @@
       tagForTaxon: tagResolver ? (name) => tagResolver(name, undefined) : null,
       colorForCategory,
     });
+    section.appendChild(createExportButtons(() => stackedHost, 'composition'));
 
     // Abundance heatmap
     section.appendChild(el('h4', { text: 'Abundance heatmap' }));
@@ -1209,6 +1299,13 @@
       tagForRow,
       colorForCategory,
     });
+    section.appendChild(createExportButtons(() => heatmapHost, 'abundance-heatmap'));
+    const abundanceCsvBtn = el('button', { type: 'button', text: 'Export full matrix as CSV' });
+    abundanceCsvBtn.addEventListener('click', () => {
+      const groupBySampleId = Object.fromEntries(included.map((s) => [s.id, s.group || '']));
+      downloadTextFile(`abundance-matrix-${comparisonRank}.csv`, abundanceMatrixToCsv(abundanceMatrix, groupBySampleId));
+    });
+    section.appendChild(el('div', { className: 'diagram-export-row' }, [abundanceCsvBtn]));
 
     // Presence/absence matrix
     section.appendChild(el('h4', { text: 'Presence / absence' }));
@@ -1235,6 +1332,7 @@
       tagForRow,
       colorForCategory,
     });
+    section.appendChild(createExportButtons(() => presenceHost, 'presence-absence'));
 
     // Small multiples sunburst
     section.appendChild(el('h4', { text: 'Community structure (small multiples)' }));
@@ -1289,6 +1387,11 @@
     }
     divTable.appendChild(divBody);
     section.appendChild(el('div', { className: 'table-wrap scroll-panel' }, [divTable]));
+    const diversityCsvBtn = el('button', { type: 'button', text: 'Export diversity summary as CSV' });
+    diversityCsvBtn.addEventListener('click', () => {
+      downloadTextFile(`diversity-summary-${comparisonRank}.csv`, diversitySummaryToCsv(diversitySummary));
+    });
+    section.appendChild(el('div', { className: 'diagram-export-row' }, [diversityCsvBtn]));
 
     // Sample similarity
     section.appendChild(el('h4', { text: 'Sample similarity' }));
@@ -1326,6 +1429,12 @@
       cellWidth: 22,
       cellHeight: 16,
     });
+    section.appendChild(createExportButtons(() => similarityHost, `similarity-${similarityMetric}`));
+    const similarityCsvBtn = el('button', { type: 'button', text: 'Export distance matrix as CSV' });
+    similarityCsvBtn.addEventListener('click', () => {
+      downloadTextFile(`similarity-${similarityMetric}-${comparisonRank}.csv`, distanceMatrixToCsv(distance));
+    });
+    section.appendChild(el('div', { className: 'diagram-export-row' }, [similarityCsvBtn]));
 
     // MicrobiomeAnalyst export — brought forward from Phase 9 and tied
     // directly to this section's current state: the same included
@@ -1428,6 +1537,15 @@
     resultsPanel.appendChild(renderSearchBox());
     resultsPanel.appendChild(el('div', { id: 'topn-chart-host' }));
     resultsPanel.appendChild(el('div', { id: 'rank-table-host' }));
+
+    if (sample.kind !== 'generic') {
+      const csvBtn = el('button', { type: 'button', className: 'diagram-export-row-btn', text: 'Export table as CSV' });
+      csvBtn.addEventListener('click', () => {
+        const csv = rankTableToCsv(getTableRows(sample), sample.id, sample.group);
+        downloadTextFile(`${sample.id}-rank-table.csv`, csv);
+      });
+      resultsPanel.appendChild(el('div', { className: 'diagram-export-row' }, [csvBtn]));
+    }
 
     renderTableAndChart();
   }
