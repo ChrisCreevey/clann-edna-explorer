@@ -380,9 +380,9 @@
     });
     table.appendChild(tbody);
 
-    return el('div', { className: 'table-wrap' }, [
+    return el('div', {}, [
       el('p', { className: 'row-count', text: `${rows.length} taxa` }),
-      table,
+      el('div', { className: 'table-wrap scroll-panel' }, [table]),
     ]);
   }
 
@@ -400,7 +400,7 @@
 
     const { top, other } = computeTopN(rows, topN);
     const maxReads = top.length > 0 ? top[0].cladeReads : 0;
-    const bars = el('div', { className: 'bar-list' });
+    const bars = el('div', { className: 'bar-list scroll-panel' });
 
     const addBar = (label, reads, pct, cls) => {
       const barRow = el('div', { className: `bar-row ${cls || ''}` });

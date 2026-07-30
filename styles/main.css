@@ -310,8 +310,30 @@ footer.site-footer a {
   color: var(--text-muted);
 }
 
+/* Reusable cap for any long list/table so it scrolls internally instead of
+   pushing the rest of the page down. Apply to new long lists/tables as the
+   site grows (heatmaps, taxon lists, comparison tables, etc). */
+.scroll-panel {
+  max-height: 22rem;
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
 .table-wrap {
   overflow-x: auto;
+}
+
+.bar-list.scroll-panel {
+  padding: 0.5rem;
+}
+
+.table-wrap.scroll-panel table.rank-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-alt);
+  z-index: 1;
 }
 
 .row-count {
