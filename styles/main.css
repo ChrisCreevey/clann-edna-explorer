@@ -525,3 +525,141 @@ table.rank-table td:nth-child(3) {
   padding: 0.2rem 0.4rem;
   font-size: 0.85rem;
 }
+
+/* ---- Overview dashboard + multi-sample comparison (Phase 5) ---- */
+
+.comparison-section h4,
+.overview-dashboard h4 {
+  margin: 1rem 0 0.4rem 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.overview-controls {
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.overview-controls select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+}
+
+table.overview-stats-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+
+table.overview-stats-table th,
+table.overview-stats-table td {
+  text-align: left;
+  padding: 0.3rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+table.overview-stats-table th {
+  color: var(--text-muted);
+  font-weight: normal;
+}
+
+.diversity-plot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+.diversity-row {
+  display: grid;
+  grid-template-columns: minmax(6rem, 10rem) 1fr minmax(9rem, max-content);
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.8rem;
+}
+
+.diversity-group-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diversity-track {
+  position: relative;
+  height: 1.4rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.diversity-range {
+  position: absolute;
+  top: 45%;
+  height: 2px;
+  background: var(--text-muted);
+}
+
+.diversity-mean {
+  position: absolute;
+  top: 15%;
+  width: 2px;
+  height: 70%;
+  background: var(--text);
+  transform: translateX(-1px);
+}
+
+.diversity-dot {
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--bg);
+}
+
+.diversity-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.stacked-bar-host,
+.heatmap-host {
+  overflow-x: auto;
+}
+
+.heatmap-host.scroll-panel {
+  max-height: 26rem;
+}
+
+.small-multiples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.small-multiple-cell {
+  width: 150px;
+  text-align: center;
+}
+
+.small-multiple-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin: 0.25rem 0 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+tr.diversity-aggregate-row td {
+  font-weight: bold;
+  border-top: 2px solid var(--border);
+}

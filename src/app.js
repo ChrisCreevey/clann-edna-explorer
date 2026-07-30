@@ -6,7 +6,7 @@
     window.ClannEDNA.folderLoader;
   const { buildSample, guessSampleIdFromFilename } = window.ClannEDNA.sample;
   const { computeSampleSummary } = window.ClannEDNA.summary;
-  const { computeAvailableRanks, computeRankTable, computeGenericTable, sortRows, computeTopN } =
+  const { RANK_ORDER, computeAvailableRanks, computeRankTable, computeGenericTable, sortRows, computeTopN } =
     window.ClannEDNA.rankTable;
   const { TaxonomyTree } = window.ClannEDNA.taxonomyTree;
   const { parseBreport } = window.ClannEDNA.breport;
@@ -17,6 +17,11 @@
   const { renderSunburstSVG } = window.ClannEDNA.sunburst;
   const { computeSankeyData, computeSankeyLayout, renderSankeySVG } = window.ClannEDNA.sankey;
   const { EXCLUDE, parseGroupNames, resolveSampleGroup, summarizeGroups } = window.ClannEDNA.groups;
+  const { computeDiversity, computeDiversitySummary } = window.ClannEDNA.diversity;
+  const { buildAbundanceMatrix, toPresenceAbsence, computeStackedComposition } = window.ClannEDNA.comparison;
+  const { computeDistanceMatrix } = window.ClannEDNA.similarity;
+  const { renderHeatmapSVG, sequentialColor, binaryColor } = window.ClannEDNA.heatmap;
+  const { renderStackedBarSVG } = window.ClannEDNA.stackedBar;
   const parsers = { parseBreport, parseBracken, parseGeneric, captureProvenance };
 
   const folderInput = document.getElementById('folder-input');
@@ -621,6 +626,365 @@
     return section;
   }
 
+  // ---- Multi-sample comparison + overview dashboard (PLAN.md Phase 5) --
+  //
+  // Everything here reads through summarizeGroups/currentGroupNames (see
+  // the Sample groups section above) rather than filtering run.samples
+  // itself, so it stays correct automatically as groups are retyped or
+  // reassigned. "Included" = every loaded sample except those set to
+  // Exclude — unassigned samples are still compared, just uncoloured.
+
+  const GROUP_PALETTE = [
+    'hsl(160, 55%, 45%)',
+    'hsl(260, 55%, 60%)',
+    'hsl(30, 75%, 55%)',
+    'hsl(200, 65%, 55%)',
+    'hsl(340, 60%, 60%)',
+    'hsl(80, 50%, 45%)',
+    'hsl(10, 65%, 55%)',
+    'hsl(280, 40%, 55%)',
+  ];
+  const UNASSIGNED_COLOR = 'hsl(0, 0%, 60%)';
+
+  function colorForGroup(groupName, groupNames) {
+    if (!groupName || groupName === EXCLUDE) return UNASSIGNED_COLOR;
+    const idx = groupNames.indexOf(groupName);
+    return idx === -1 ? UNASSIGNED_COLOR : GROUP_PALETTE[idx % GROUP_PALETTE.length];
+  }
+
+  /** Included (non-excluded) samples, ordered group-block-first then unassigned, matching every other group-aware view. */
+  function orderedIncludedSamples() {
+    const groupNames = currentGroupNames();
+    const summary = summarizeGroups(run.samples, groupNames);
+    const orderedIds = [...summary.byGroup.values()].flat().concat(summary.unassigned);
+    return orderedIds.map((id) => run.samples.get(id));
+  }
+
+  function unionAvailableRanks(sampleIds) {
+    const present = new Set();
+    sampleIds.forEach((id) => computeAvailableRanks(run.tree, id).forEach((r) => present.add(r)));
+    return RANK_ORDER.filter((r) => present.has(r));
+  }
+
+  let comparisonRank = null;
+
+  function renderComparisonRankControl(sampleIds, onChange) {
+    const ranks = unionAvailableRanks(sampleIds);
+    if (!comparisonRank || !ranks.includes(comparisonRank)) comparisonRank = ranks[ranks.length - 1] || null;
+    const select = el('select');
+    ranks.forEach((r) => {
+      const opt = el('option', { value: r, text: r });
+      opt.selected = r === comparisonRank;
+      select.appendChild(opt);
+    });
+    select.addEventListener('change', () => {
+      comparisonRank = select.value;
+      onChange();
+    });
+    return { control: el('div', { className: 'rank-controls' }, [el('label', { text: 'Rank: ' }), select]), ranks };
+  }
+
+  // ---- Overview dashboard ----------------------------------------------
+
+  let overviewMetric = 'shannon';
+  const METRIC_LABELS = { richness: 'Richness', shannon: 'Shannon index', simpson: 'Simpson’s Index of Diversity' };
+
+  function renderOverviewDashboard() {
+    const included = orderedIncludedSamples().filter((s) => s.kind !== 'generic');
+    if (included.length < 2) return null;
+
+    const groupNames = currentGroupNames();
+    const section = el('div', { className: 'viz-section overview-dashboard' });
+    section.appendChild(el('h3', { text: 'Overview' }));
+
+    // Run-level stats, per group when >1 group has samples.
+    const summary = summarizeGroups(run.samples, groupNames);
+    const activeGroups = groupNames.filter((g) => summary.byGroup.get(g).length > 0);
+    const buckets =
+      activeGroups.length > 1
+        ? activeGroups.map((g) => ({ label: g, ids: summary.byGroup.get(g) }))
+        : [{ label: 'All samples', ids: included.map((s) => s.id) }];
+    if (summary.unassigned.length > 0 && activeGroups.length > 1) {
+      buckets.push({ label: 'Unassigned', ids: summary.unassigned });
+    }
+
+    const statsTable = el('table', { className: 'overview-stats-table' });
+    const headRow = el('tr', {}, ['Group', 'n', 'Total reads (mean, range)', 'Classified % (mean, range)'].map((h) => el('th', { text: h })));
+    statsTable.appendChild(el('thead', {}, [headRow]));
+    const tbody = el('tbody');
+    buckets.forEach((bucket) => {
+      const stats = bucket.ids
+        .map((id) => run.samples.get(id))
+        .filter((s) => s && s.kind !== 'generic')
+        .map((s) => computeSampleSummary(run.tree, s.id));
+      if (stats.length === 0) return;
+      const totals = stats.map((s) => s.totalReads);
+      const pcts = stats.map((s) => s.classifiedPct);
+      const mean = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
+      tbody.appendChild(
+        el('tr', {}, [
+          el('td', { text: bucket.label }),
+          el('td', { text: String(stats.length) }),
+          el('td', { text: `${Math.round(mean(totals)).toLocaleString()} (${Math.min(...totals).toLocaleString()}–${Math.max(...totals).toLocaleString()})` }),
+          el('td', { text: `${mean(pcts).toFixed(1)}% (${Math.min(...pcts).toFixed(1)}–${Math.max(...pcts).toFixed(1)}%)` }),
+        ])
+      );
+    });
+    statsTable.appendChild(tbody);
+    section.appendChild(statsTable);
+
+    // Diversity plot: metric selector + rank-aware per-group mean/range and per-sample points.
+    const controlsRow = el('div', { className: 'overview-controls' });
+    const metricSelect = el('select');
+    Object.entries(METRIC_LABELS).forEach(([key, label]) => {
+      const opt = el('option', { value: key, text: label });
+      opt.selected = key === overviewMetric;
+      metricSelect.appendChild(opt);
+    });
+    metricSelect.addEventListener('change', () => {
+      overviewMetric = metricSelect.value;
+      renderResults();
+    });
+    controlsRow.appendChild(el('label', { text: 'Diversity metric: ' }));
+    controlsRow.appendChild(metricSelect);
+    section.appendChild(controlsRow);
+
+    const rankInfo = renderComparisonRankControl(included.map((s) => s.id), renderResults);
+    section.appendChild(rankInfo.control);
+
+    if (comparisonRank) {
+      const samplesWithGroup = included.map((s) => ({ id: s.id, group: s.group || 'Unassigned' }));
+      const diversitySummary = computeDiversitySummary(run.tree, samplesWithGroup, comparisonRank);
+      section.appendChild(renderDiversityPlot(diversitySummary, overviewMetric, groupNames));
+    }
+
+    return section;
+  }
+
+  function renderDiversityPlot(diversitySummary, metric, groupNames) {
+    const container = el('div', { className: 'diversity-plot' });
+    const allValues = diversitySummary.perSample.map((s) => s[metric]);
+    const min = Math.min(...allValues, 0);
+    const max = Math.max(...allValues, 1e-9);
+    const scale = (v) => (max > min ? ((v - min) / (max - min)) * 100 : 50);
+
+    for (const [group, agg] of diversitySummary.groupAggregates) {
+      const row = el('div', { className: 'diversity-row' });
+      row.appendChild(el('span', { className: 'diversity-group-label', text: group }));
+      const track = el('div', { className: 'diversity-track' });
+
+      const rangeBar = el('div', { className: 'diversity-range' });
+      rangeBar.style.left = `${scale(agg[metric].min)}%`;
+      rangeBar.style.width = `${Math.max(0.5, scale(agg[metric].max) - scale(agg[metric].min))}%`;
+      track.appendChild(rangeBar);
+
+      const meanMarker = el('div', { className: 'diversity-mean' });
+      meanMarker.style.left = `${scale(agg[metric].mean)}%`;
+      track.appendChild(meanMarker);
+
+      diversitySummary.perSample
+        .filter((s) => s.group === group)
+        .forEach((s) => {
+          const dot = el('div', { className: 'diversity-dot' });
+          dot.style.left = `${scale(s[metric])}%`;
+          dot.style.background = colorForGroup(group === 'Unassigned' ? null : group, groupNames);
+          dot.title = `${s.id}: ${s[metric].toFixed(3)}`;
+          track.appendChild(dot);
+        });
+
+      row.appendChild(track);
+      row.appendChild(
+        el('span', {
+          className: 'diversity-value',
+          text: `${agg[metric].mean.toFixed(2)} (${agg[metric].min.toFixed(2)}–${agg[metric].max.toFixed(2)})`,
+        })
+      );
+      container.appendChild(row);
+    }
+    return container;
+  }
+
+  // ---- Multi-sample comparison core -------------------------------------
+
+  let stackedBarTopN = 10;
+  let heatmapMaxRows = 50;
+  let presenceThreshold = 1;
+  let similarityMetric = 'bray-curtis';
+
+  function sampleGroupLabelFn(samples) {
+    const byId = new Map(samples.map((s) => [s.id, s]));
+    return (id) => {
+      const s = byId.get(id);
+      return s && s.group ? `${id} (${s.group})` : id;
+    };
+  }
+
+  function renderComparisonSection() {
+    const included = orderedIncludedSamples().filter((s) => s.kind !== 'generic');
+    if (included.length < 2) return null;
+
+    const groupNames = currentGroupNames();
+    const sampleIds = included.map((s) => s.id);
+    const colGroupColors = included.map((s) => colorForGroup(s.group, groupNames));
+
+    const section = el('div', { className: 'viz-section comparison-section' });
+    section.appendChild(el('h3', { text: 'Multi-sample comparison' }));
+
+    const rankInfo = renderComparisonRankControl(sampleIds, renderResults);
+    section.appendChild(rankInfo.control);
+    if (!comparisonRank) {
+      section.appendChild(el('p', { className: 'empty-state', text: 'No shared rank available across the included samples.' }));
+      return section;
+    }
+
+    // Stacked composition bar chart
+    section.appendChild(el('h4', { text: 'Composition' }));
+    const topNRow = el('div', { className: 'topn-controls' });
+    const topNInput = el('input', { type: 'number', min: '2', max: '30', value: String(stackedBarTopN) });
+    topNInput.addEventListener('change', () => {
+      stackedBarTopN = Math.max(2, Number(topNInput.value) || 10);
+      renderResults();
+    });
+    topNRow.appendChild(el('label', { text: 'Top N taxa: ' }));
+    topNRow.appendChild(topNInput);
+    section.appendChild(topNRow);
+
+    const stackedHost = el('div', { className: 'stacked-bar-host' });
+    section.appendChild(stackedHost);
+    const stackedData = computeStackedComposition(run.tree, sampleIds, comparisonRank, stackedBarTopN);
+    renderStackedBarSVG(stackedHost, stackedData, { sampleLabels: sampleGroupLabelFn(included) });
+
+    // Abundance heatmap
+    section.appendChild(el('h4', { text: 'Abundance heatmap' }));
+    const abundanceMatrix = buildAbundanceMatrix(run.tree, sampleIds, comparisonRank);
+    const cappedAbundance = {
+      ...abundanceMatrix,
+      taxa: abundanceMatrix.taxa.slice(0, heatmapMaxRows),
+      matrix: abundanceMatrix.matrix.slice(0, heatmapMaxRows),
+    };
+    section.appendChild(
+      el('p', {
+        className: 'row-count',
+        text: `Showing top ${Math.min(heatmapMaxRows, abundanceMatrix.taxa.length)} of ${abundanceMatrix.taxa.length} taxa by total abundance.`,
+      })
+    );
+    const heatmapHost = el('div', { className: 'heatmap-host scroll-panel' });
+    section.appendChild(heatmapHost);
+    renderHeatmapSVG(heatmapHost, {
+      rowLabels: cappedAbundance.taxa.map((t) => t.name),
+      colLabels: sampleIds.map(sampleGroupLabelFn(included)),
+      matrix: cappedAbundance.matrix,
+      colGroupColors,
+    });
+
+    // Presence/absence matrix
+    section.appendChild(el('h4', { text: 'Presence / absence' }));
+    const thresholdRow = el('div', { className: 'topn-controls' });
+    const thresholdInput = el('input', { type: 'number', min: '1', value: String(presenceThreshold) });
+    thresholdInput.addEventListener('change', () => {
+      presenceThreshold = Math.max(1, Number(thresholdInput.value) || 1);
+      renderResults();
+    });
+    thresholdRow.appendChild(el('label', { text: 'Minimum reads to count as present: ' }));
+    thresholdRow.appendChild(thresholdInput);
+    section.appendChild(thresholdRow);
+
+    const presenceAbsence = toPresenceAbsence(cappedAbundance, presenceThreshold);
+    const presenceHost = el('div', { className: 'heatmap-host scroll-panel' });
+    section.appendChild(presenceHost);
+    renderHeatmapSVG(presenceHost, {
+      rowLabels: presenceAbsence.taxa.map((t) => t.name),
+      colLabels: sampleIds.map(sampleGroupLabelFn(included)),
+      matrix: presenceAbsence.matrix,
+      colorFn: binaryColor,
+      colGroupColors,
+    });
+
+    // Small multiples sunburst
+    section.appendChild(el('h4', { text: 'Community structure (small multiples)' }));
+    const smallMultiples = el('div', { className: 'small-multiples' });
+    section.appendChild(smallMultiples);
+    included.forEach((sample) => {
+      const hierarchyRoot = buildHierarchyTree(run.tree, sample.id);
+      if (!hierarchyRoot) return;
+      const cell = el('div', { className: 'small-multiple-cell' });
+      cell.appendChild(el('p', { className: 'small-multiple-label', text: sampleGroupLabelFn(included)(sample.id) }));
+      const host = el('div', {});
+      cell.appendChild(host);
+      renderSunburstSVG(host, hierarchyRoot, { size: 140, ringWidth: 12, centerR: 10, maxDepth: 5 });
+      smallMultiples.appendChild(cell);
+    });
+
+    // Diversity summary table
+    section.appendChild(el('h4', { text: 'Diversity summary' }));
+    const samplesWithGroup = included.map((s) => ({ id: s.id, group: s.group || 'Unassigned' }));
+    const diversitySummary = computeDiversitySummary(run.tree, samplesWithGroup, comparisonRank);
+    const divTable = el('table', { className: 'rank-table' });
+    const divHead = el('tr', {}, ['Sample', 'Group', 'Richness', 'Shannon', 'Simpson'].map((h) => el('th', { text: h })));
+    divTable.appendChild(el('thead', {}, [divHead]));
+    const divBody = el('tbody');
+    diversitySummary.perSample.forEach((s) => {
+      divBody.appendChild(
+        el('tr', {}, [
+          el('td', { text: s.id }),
+          el('td', { text: s.group }),
+          el('td', { text: String(s.richness) }),
+          el('td', { text: s.shannon.toFixed(3) }),
+          el('td', { text: s.simpson.toFixed(3) }),
+        ])
+      );
+    });
+    for (const [group, agg] of diversitySummary.groupAggregates) {
+      divBody.appendChild(
+        el('tr', { className: 'diversity-aggregate-row' }, [
+          el('td', { text: `${group} (mean)` }),
+          el('td', { text: '' }),
+          el('td', { text: agg.richness.mean.toFixed(1) }),
+          el('td', { text: agg.shannon.mean.toFixed(3) }),
+          el('td', { text: agg.simpson.mean.toFixed(3) }),
+        ])
+      );
+    }
+    divTable.appendChild(divBody);
+    section.appendChild(el('div', { className: 'table-wrap scroll-panel' }, [divTable]));
+
+    // Sample similarity
+    section.appendChild(el('h4', { text: 'Sample similarity' }));
+    const metricRow = el('div', { className: 'topn-controls' });
+    const metricSelect = el('select');
+    [
+      ['bray-curtis', 'Bray-Curtis (abundance)'],
+      ['jaccard', 'Jaccard (presence/absence)'],
+    ].forEach(([value, label]) => {
+      const opt = el('option', { value, text: label });
+      opt.selected = value === similarityMetric;
+      metricSelect.appendChild(opt);
+    });
+    metricSelect.addEventListener('change', () => {
+      similarityMetric = metricSelect.value;
+      renderResults();
+    });
+    metricRow.appendChild(el('label', { text: 'Distance metric: ' }));
+    metricRow.appendChild(metricSelect);
+    section.appendChild(metricRow);
+
+    const distance = computeDistanceMatrix(run.tree, sampleIds, comparisonRank, similarityMetric, { minAbundance: presenceThreshold });
+    const similarityHost = el('div', { className: 'heatmap-host scroll-panel' });
+    section.appendChild(similarityHost);
+    const labels = sampleIds.map(sampleGroupLabelFn(included));
+    renderHeatmapSVG(similarityHost, {
+      rowLabels: labels,
+      colLabels: labels,
+      matrix: distance.matrix,
+      colorFn: (v, mn, mx) => sequentialColor(mn + mx - v, mn, mx), // invert: 0 distance (identical) reads strongest
+      colGroupColors,
+      cellWidth: 22,
+      cellHeight: 16,
+    });
+
+    return section;
+  }
+
   function renderResults() {
     if (run.samples.size === 0) return;
     resultsPanel.innerHTML = '';
@@ -628,6 +992,12 @@
 
     const groupsSection = renderGroupsSection();
     if (groupsSection) resultsPanel.appendChild(groupsSection);
+
+    const overviewSection = renderOverviewDashboard();
+    if (overviewSection) resultsPanel.appendChild(overviewSection);
+
+    const comparisonSection = renderComparisonSection();
+    if (comparisonSection) resultsPanel.appendChild(comparisonSection);
 
     const selector = renderSampleSelector();
     if (selector) resultsPanel.appendChild(selector);

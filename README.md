@@ -21,10 +21,20 @@ Phase 1 (investigation, data model, parsers, folder-based loading),
 Phase 2 (single-sample parsing, read-summary card, rank-by-rank table,
 Top-N bar chart, generic fallback with manual column mapping), Phase 3
 (Krona-style zoomable sunburst, Pavian-style Sankey diagram with a
-configurable rank cutoff), and Phase 4 (comma-separated group text box,
+configurable rank cutoff), Phase 4 (comma-separated group text box,
 per-sample group dropdown with Exclude, live recalculation with no
-re-parse) are built. Later phases (multi-sample comparison views,
-diversity/similarity, exports) are not yet built — see `PLAN.md` §3.
+re-parse), and Phase 5 (overview dashboard with per-group run stats and a
+diversity plot; multi-sample comparison — stacked composition bar chart,
+abundance heatmap, presence/absence matrix, small-multiples sunburst,
+diversity summary table, Bray-Curtis/Jaccard sample-similarity matrix, all
+group-aware) are built. Later phases (filtering/search, metadata mapping
+and taxon tagging, staging exports) are not yet built — see `PLAN.md` §3.
+
+NMDS/PCA ordination remains explicitly out of v1 scope (per PLAN.md's
+open-points resolution) — sample similarity is a distance-matrix heatmap,
+not a dimensionality-reduced plot. Hierarchical clustering of the heatmap's
+row/column order is also not implemented; rows/columns are ordered by
+total abundance / group membership only.
 
 ## Running locally
 
@@ -56,12 +66,21 @@ src/parsers/           .bracken / .breport / generic parsers, content sniffer,
 src/model/              shared taxid-keyed taxonomy tree, sample builder,
                         read-summary stats, rank-table/Top-N computation,
                         nested-hierarchy builder for the visualisations,
-                        sample-group bookkeeping (groups.js)
-src/viz/                sunburst (Krona-style) and Sankey (Pavian-style)
-                        layout math + SVG rendering
-src/app.js              UI wiring (folder loading, tick-list, sample loading,
-                        summary card, rank table, Top-N chart, sunburst,
-                        Sankey, theme toggle)
+                        sample-group bookkeeping (groups.js), diversity
+                        indices (diversity.js), cross-sample abundance
+                        matrix + presence/absence + stacked composition
+                        (comparison.js), Bray-Curtis/Jaccard distance
+                        matrix (similarity.js)
+src/viz/                sunburst (Krona-style), Sankey (Pavian-style),
+                        generic heatmap (heatmap.js — abundance,
+                        presence/absence, and similarity all reuse it),
+                        and stacked composition bar chart, all layout math
+                        + SVG rendering
+src/app.js              UI wiring: folder loading, tick-list, sample
+                        loading, sample groups, overview dashboard,
+                        multi-sample comparison, per-sample summary card,
+                        rank table, Top-N chart, sunburst, Sankey, theme
+                        toggle
 test/                    zero-dependency test harness + tests
 test/fixtures/           real example files used by the test suite
 examples/                trimmed example run for the hosted demo
