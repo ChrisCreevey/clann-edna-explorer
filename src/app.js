@@ -1001,6 +1001,7 @@
 
   let sankeyStartRank = null;
   let sankeyEndRank = null;
+  let sankeyMaxNodesPerColumn = 12;
 
   function renderSankeySection(sample) {
     const ranks = computeAvailableRanks(run.tree, sample.id);
@@ -1027,7 +1028,14 @@
     controls.appendChild(startSelect);
     controls.appendChild(el('label', { text: ' to rank: ' }));
     controls.appendChild(endSelect);
+
+    const maxNodesInput = el('input', { type: 'number', min: '2', max: '40', value: String(sankeyMaxNodesPerColumn) });
+    controls.appendChild(el('label', { text: ' max taxa shown per rank: ' }));
+    controls.appendChild(maxNodesInput);
     section.appendChild(controls);
+
+    const note = el('p', { className: 'hint sankey-note' });
+    section.appendChild(note);
 
     const host = el('div', { className: 'sankey-host' });
     section.appendChild(host);
@@ -1039,10 +1047,14 @@
       const rankRange = ranks.slice(lo, hi + 1);
       if (rankRange.length < 2) {
         host.innerHTML = '';
+        note.textContent = '';
         host.appendChild(el('p', { className: 'empty-state', text: 'Pick two different ranks to draw a flow diagram.' }));
         return;
       }
-      const data = computeSankeyData(run.tree, sample.id, rankRange, { filters: currentFilters() });
+      const data = computeSankeyData(run.tree, sample.id, rankRange, {
+        filters: currentFilters(),
+        maxNodesPerColumn: sankeyMaxNodesPerColumn,
+      });
       const width = Math.max(600, host.clientWidth || 700);
       const layout = computeSankeyLayout(data, { width, height: 420 });
       renderSankeySVG(host, layout, {
@@ -1052,6 +1064,19 @@
         tagFor: currentTagResolver(),
         colorForCategory,
       });
+
+      // Only the largest `sankeyMaxNodesPerColumn` taxa per rank (after the
+      // global filters) are drawn — smaller ones are left out rather than
+      // lumped into a meaningless "Other" group, so bar heights are a
+      // fraction of the whole sample and columns cover less height at
+      // finer ranks as more reads fall outside what's shown.
+      const finestCol = data.columns[data.columns.length - 1];
+      const shownReads = finestCol.nodes.reduce((s, n) => s + n.cladeReads, 0);
+      const shownPct = data.grandTotal > 0 ? (100 * shownReads) / data.grandTotal : 0;
+      const hiddenPct = data.grandTotal > 0 ? (100 * finestCol.hiddenReads) / data.grandTotal : 0;
+      note.textContent = finestCol.hiddenCount > 0
+        ? `Showing the ${finestCol.nodes.length} largest taxa at ${finestCol.rank} rank (${shownPct.toFixed(1)}% of reads). ${finestCol.hiddenCount} smaller taxa (${hiddenPct.toFixed(1)}% of reads) are below the minimum-abundance filter or outside the top ${sankeyMaxNodesPerColumn} and are not shown.`
+        : `Showing all ${finestCol.nodes.length} taxa at ${finestCol.rank} rank (${shownPct.toFixed(1)}% of reads).`;
     }
 
     startSelect.addEventListener('change', () => {
@@ -1060,6 +1085,10 @@
     });
     endSelect.addEventListener('change', () => {
       sankeyEndRank = endSelect.value;
+      draw();
+    });
+    maxNodesInput.addEventListener('change', () => {
+      sankeyMaxNodesPerColumn = Math.max(2, Number(maxNodesInput.value) || 12);
       draw();
     });
 

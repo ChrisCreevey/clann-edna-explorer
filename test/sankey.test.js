@@ -59,22 +59,45 @@ test('layout: node heights are proportional to cladeReads within a column', () =
   }
 });
 
-test('species column (454 taxa) is capped, with the remainder bucketed into "Other"', () => {
+test('species column (454 taxa) is capped to the largest taxa, with the rest simply left out (no "Other" node)', () => {
   const tree = loadTree();
   const data = computeSankeyData(tree, 'barcode39', ['D', 'P', 'C', 'O', 'F', 'G', 'S']);
   const speciesCol = data.columns.find((c) => c.rank === 'S');
   assert.strictEqual(speciesCol.nodes.length, 12); // default maxNodesPerColumn
-  assert.ok(speciesCol.nodes.some((n) => String(n.taxid).startsWith('other:')));
+  assert.ok(!speciesCol.nodes.some((n) => String(n.taxid).startsWith('other:')));
+  assert.strictEqual(speciesCol.hiddenCount, 454 - 12);
+  assert.ok(speciesCol.hiddenReads > 0);
 });
 
-test('no reads are lost through "Other" bucketing — node totals match link totals into that column', () => {
+test('shown node reads plus hidden reads account for every species-rank read; links match the shown nodes exactly', () => {
   const tree = loadTree();
   const data = computeSankeyData(tree, 'barcode39', ['D', 'P', 'C', 'O', 'F', 'G', 'S']);
   const speciesCol = data.columns.find((c) => c.rank === 'S');
   const nodeTotal = speciesCol.nodes.reduce((s, n) => s + n.cladeReads, 0);
   const linkTotal = data.links.filter((l) => l.targetRank === 'S').reduce((s, l) => s + l.value, 0);
-  assert.strictEqual(nodeTotal, 567327);
-  assert.strictEqual(linkTotal, 567327);
+  assert.strictEqual(nodeTotal + speciesCol.hiddenReads, 567327);
+  assert.strictEqual(linkTotal, nodeTotal);
+});
+
+test('grandTotal is the full, uncapped read total at the first requested rank', () => {
+  const tree = loadTree();
+  const data = computeSankeyData(tree, 'barcode39', ['D', 'P', 'C', 'O', 'F', 'G', 'S']);
+  assert.strictEqual(data.grandTotal, 567493);
+});
+
+test('layout: a column that leaves more reads out covers less of the canvas height than one that leaves less out', () => {
+  const tree = loadTree();
+  const data = computeSankeyData(tree, 'barcode39', ['D', 'P', 'C', 'O', 'F', 'G', 'S']);
+  const layout = computeSankeyLayout(data, { width: 900, height: 400 });
+  const coverage = (rank) => {
+    const nodes = layout.nodes.filter((n) => n.rank === rank);
+    return Math.max(...nodes.map((n) => n.y1)) - Math.min(...nodes.map((n) => n.y0));
+  };
+  // Domain has almost nothing hidden; species has the most hidden (454 taxa
+  // capped to 12) — its bars should cover noticeably less height, since
+  // every bar is sized against the same grandTotal rather than
+  // renormalized to fill each column.
+  assert.ok(coverage('S') < coverage('D'), 'species column should cover less height than domain, not be stretched to fill the column');
 });
 
 test('a custom maxNodesPerColumn is respected', () => {
@@ -91,6 +114,32 @@ test('layout: link geometry connects source right-edge to target left-edge', () 
   layout.links.forEach((link) => {
     assert.ok(link.tx > link.sx, 'target column must be to the right of source column');
   });
+});
+
+test('layout reserves right-hand margin so the last column never reaches the canvas edge', () => {
+  const tree = loadTree();
+  const data = computeSankeyData(tree, 'barcode39', ['D', 'P', 'C', 'O', 'F', 'G', 'S']);
+  const layout = computeSankeyLayout(data, { width: 700, height: 400, nodeWidth: 16 });
+  const lastColX = Math.max(...layout.nodes.map((n) => n.x));
+  assert.ok(lastColX + layout.nodeWidth < 700, 'last column bars must leave room for their labels');
+});
+
+test('a node is ordered next to its largest incoming flow\'s parent position (fewer crossings than a size-only sort)', () => {
+  const tree = loadTree();
+  const data = computeSankeyData(tree, 'barcode39', ['D', 'P', 'C', 'O', 'F', 'G', 'S']);
+  const genusCol = data.columns.find((c) => c.rank === 'G');
+  const familyCol = data.columns.find((c) => c.rank === 'F');
+  const familyOrder = new Map(familyCol.nodes.map((n, i) => [n.taxid, i]));
+
+  const parentOrderOf = (genusTaxid) => {
+    const link = data.links.find((l) => l.targetRank === 'G' && l.targetTaxid === genusTaxid);
+    return link ? familyOrder.get(link.sourceTaxid) : undefined;
+  };
+
+  const orders = genusCol.nodes.map((n) => parentOrderOf(n.taxid)).filter((o) => o !== undefined);
+  for (let i = 1; i < orders.length; i++) {
+    assert.ok(orders[i] >= orders[i - 1], 'genus column should be grouped by parent family order, not just size');
+  }
 });
 
 test('an excluded species is dropped from its rank column, same as the rank table', () => {
