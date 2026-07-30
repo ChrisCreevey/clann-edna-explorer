@@ -23,6 +23,7 @@
   const { renderHeatmapSVG, sequentialColor, binaryColor } = window.ClannEDNA.heatmap;
   const { renderStackedBarSVG } = window.ClannEDNA.stackedBar;
   const { parseExclusionList, matchesSearch } = window.ClannEDNA.filters;
+  const { buildMicrobiomeAnalystExport } = window.ClannEDNA.microbiomeAnalystExport;
   const parsers = { parseBreport, parseBracken, parseGeneric, captureProvenance };
 
   const folderInput = document.getElementById('folder-input');
@@ -275,6 +276,18 @@
     });
     children.forEach((c) => node.appendChild(c));
     return node;
+  }
+
+  function downloadTextFile(filename, text) {
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   // ---- Sample groups (PLAN.md Phase 4) --------------------------------
@@ -1104,6 +1117,65 @@
       cellWidth: 22,
       cellHeight: 16,
     });
+
+    // MicrobiomeAnalyst export — brought forward from Phase 9 and tied
+    // directly to this section's current state: the same included
+    // samples, the same rank, the same global filters (exclusion list +
+    // abundance threshold), and the current group assignments. Built to
+    // spec exactly (see src/model/microbiome-analyst-export.js) as the
+    // primary structured export; nothing here re-derives its own idea of
+    // "current" — it reads the exact same sampleIds/comparisonRank/
+    // currentFilters()/samplesWithGroup this section already computed.
+    section.appendChild(el('h4', { text: 'Export for MicrobiomeAnalyst' }));
+    section.appendChild(
+      el('p', {
+        className: 'viz-breadcrumb',
+        text: 'Three files built to the MicrobiomeAnalyst data format, reflecting exactly the samples, rank, and filters currently shown above (excluded samples and filtered-out taxa are not included).',
+      })
+    );
+
+    const exportResult = buildMicrobiomeAnalystExport(run.tree, sampleIds, comparisonRank, samplesWithGroup, {
+      filters: currentFilters(),
+    });
+
+    if (exportResult.warnings.length > 0) {
+      const warningBox = el('div', { className: 'export-warnings' });
+      exportResult.warnings.forEach((w) => warningBox.appendChild(el('p', { text: `⚠ ${w}` })));
+      section.appendChild(warningBox);
+    }
+
+    if (exportResult.sanitizationChanges.length > 0) {
+      const details = el('details', { className: 'provenance-details' });
+      details.appendChild(
+        el('summary', { text: `${exportResult.sanitizationChanges.length} label(s) auto-converted to satisfy the spec's naming rules` })
+      );
+      const list = el('ul', {});
+      exportResult.sanitizationChanges.forEach((c) => {
+        list.appendChild(el('li', { text: `"${c.original}" → "${c.sanitized}"` }));
+      });
+      details.appendChild(list);
+      section.appendChild(details);
+    }
+
+    section.appendChild(
+      el('p', {
+        className: 'row-count',
+        text: `${exportResult.taxonCount} taxa × ${exportResult.sampleCount} samples at rank ${comparisonRank}.`,
+      })
+    );
+
+    const downloadRow = el('div', { className: 'export-download-row' });
+    const files = [
+      ['abundance_table.txt', exportResult.abundanceTableText, 'Abundance table'],
+      ['taxonomy_mapping.txt', exportResult.taxonomyMappingText, 'Taxonomy mapping'],
+      ['metadata.txt', exportResult.metadataText, 'Metadata'],
+    ];
+    files.forEach(([filename, text, label]) => {
+      const btn = el('button', { type: 'button', className: 'primary', text: `Download ${label}` });
+      btn.addEventListener('click', () => downloadTextFile(filename, text));
+      downloadRow.appendChild(btn);
+    });
+    section.appendChild(downloadRow);
 
     return section;
   }

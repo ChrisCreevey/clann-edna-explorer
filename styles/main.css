@@ -738,3 +738,25 @@ table.rank-table tr.search-match td:first-child {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+
+/* ---- MicrobiomeAnalyst export ---- */
+
+.export-warnings {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.85rem;
+}
+
+.export-warnings p {
+  margin: 0.2rem 0;
+}
+
+.export-download-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}

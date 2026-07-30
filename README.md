@@ -27,14 +27,19 @@ re-parse), and Phase 5 (overview dashboard with per-group run stats and a
 diversity plot; multi-sample comparison — stacked composition bar chart,
 abundance heatmap, presence/absence matrix, small-multiples sunburst,
 diversity summary table, Bray-Curtis/Jaccard sample-similarity matrix, all
-group-aware), and Phase 7 (global minimum-abundance filter and
+group-aware), Phase 7 (global minimum-abundance filter and
 host/contaminant exclusion list — both applied centrally inside
 computeRankTable so every view that reads through it recalculates
 consistently; cross-view taxon search that highlights matches, rather than
 filtering, in the single-sample table, Top-N chart, stacked composition
-chart, abundance/presence heatmaps, sunburst, and Sankey) are built. Later
-phases (metadata mapping and taxon category tagging, staging exports) are
-not yet built — see `PLAN.md` §3.
+chart, abundance/presence heatmaps, sunburst, and Sankey), and — brought
+forward from Phase 9 — the MicrobiomeAnalyst structured export (abundance
+table, taxonomy mapping, metadata, all tab-delimited to spec) at the
+bottom of the Multi-sample comparison section, wired to the exact same
+included samples, rank, and filters currently on screen. Later phases
+(metadata mapping and taxon category tagging; the plain CSV/diversity
+exports, diagram PNG/SVG export, and BLAST Explorer cross-link still
+pending from Phase 9) are not yet built — see `PLAN.md` §3.
 
 The exclusion list and abundance threshold apply to every rank-table-
 derived view (single-sample table, Top-N chart, comparison heatmaps,
@@ -87,7 +92,8 @@ src/model/              shared taxid-keyed taxonomy tree, sample builder,
                         (comparison.js), Bray-Curtis/Jaccard distance
                         matrix (similarity.js), global abundance-threshold/
                         exclusion-list filtering + search matching
-                        (filters.js)
+                        (filters.js), MicrobiomeAnalyst 3-file structured
+                        export (microbiome-analyst-export.js)
 src/viz/                sunburst (Krona-style), Sankey (Pavian-style),
                         generic heatmap (heatmap.js — abundance,
                         presence/absence, and similarity all reuse it),
