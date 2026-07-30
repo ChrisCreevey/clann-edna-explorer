@@ -100,11 +100,12 @@ function renderSunburstSVG(container, root, options = {}) {
     segments.forEach((seg) => {
       const innerR = centerR + (seg.depth - 1) * ringWidth;
       const outerR = innerR + ringWidth;
+      const highlighted = options.isHighlighted && options.isHighlighted(seg.node.name, seg.node.taxid);
       const path = document.createElementNS(SVG_NS, 'path');
       path.setAttribute('d', arcPath(cx, cy, innerR, outerR, seg.angleStart, seg.angleEnd));
       path.setAttribute('fill', colorForSunburstSeed(seg.node.taxid));
-      path.setAttribute('stroke', 'var(--bg)');
-      path.setAttribute('stroke-width', '0.5');
+      path.setAttribute('stroke', highlighted ? 'var(--accent)' : 'var(--bg)');
+      path.setAttribute('stroke-width', highlighted ? '2.5' : '0.5');
       path.style.cursor = seg.node.children.length > 0 ? 'pointer' : 'default';
 
       const title = document.createElementNS(SVG_NS, 'title');

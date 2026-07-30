@@ -40,6 +40,7 @@
    *   cellHeight?: number,
    *   labelWidth?: number,
    *   showValues?: boolean,
+   *   isRowHighlighted?: (label: string) => boolean,
    * }} spec
    */
   function renderHeatmapSVG(container, spec) {
@@ -53,6 +54,7 @@
       cellHeight = 18,
       labelWidth = 160,
       showValues = false,
+      isRowHighlighted = null,
     } = spec;
 
     container.innerHTML = '';
@@ -106,11 +108,14 @@
     rowLabels.forEach((label, r) => {
       const y = headerHeight + groupStripHeight + r * cellHeight;
 
+      const highlighted = isRowHighlighted && isRowHighlighted(label);
+
       const rowLabelText = document.createElementNS(HEATMAP_SVG_NS, 'text');
       rowLabelText.setAttribute('x', labelWidth - 6);
       rowLabelText.setAttribute('y', y + cellHeight / 2 + 3);
       rowLabelText.setAttribute('font-size', '10');
-      rowLabelText.setAttribute('fill', 'var(--text)');
+      rowLabelText.setAttribute('fill', highlighted ? 'var(--accent)' : 'var(--text)');
+      rowLabelText.setAttribute('font-weight', highlighted ? 'bold' : 'normal');
       rowLabelText.setAttribute('text-anchor', 'end');
       rowLabelText.textContent = label;
       svg.appendChild(rowLabelText);
@@ -122,6 +127,10 @@
         rect.setAttribute('width', cellWidth - 1);
         rect.setAttribute('height', cellHeight - 1);
         rect.setAttribute('fill', colorFn(value, min, max));
+        if (highlighted) {
+          rect.setAttribute('stroke', 'var(--accent)');
+          rect.setAttribute('stroke-width', '2');
+        }
         const title = document.createElementNS(HEATMAP_SVG_NS, 'title');
         title.textContent = `${label} × ${colLabels[c]}: ${Number.isInteger(value) ? value : value.toFixed(3)}`;
         rect.appendChild(title);

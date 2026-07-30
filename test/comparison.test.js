@@ -80,4 +80,12 @@ test('stacked composition uses the same top taxa (by combined total) for every s
   });
 });
 
+test('buildAbundanceMatrix respects an exclusion filter across every sample column', () => {
+  const tree = loadTree();
+  const m = buildAbundanceMatrix(tree, ['barcode39', 'barcode40'], 'S', {
+    filters: { exclusionTerms: ['Coccinella transversoguttata'] },
+  });
+  assert.strictEqual(m.taxa.find((t) => t.taxid === 1790162), undefined);
+});
+
 report();

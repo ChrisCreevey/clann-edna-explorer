@@ -17,8 +17,8 @@
    * @param {string} rank - canonical rank letter, e.g. 'S'
    * @returns {{richness: number, shannon: number, simpson: number, totalReads: number}}
    */
-  function computeDiversity(tree, sampleId, rank) {
-    const rows = computeRankTable(tree, sampleId, rank).filter((r) => r.cladeReads > 0);
+  function computeDiversity(tree, sampleId, rank, filters = null) {
+    const rows = computeRankTable(tree, sampleId, rank, '', filters).filter((r) => r.cladeReads > 0);
     const totalReads = rows.reduce((s, r) => s + r.cladeReads, 0);
 
     if (totalReads === 0 || rows.length === 0) {
@@ -50,11 +50,11 @@
    * @param {Array<{id: string, group: string}>} samplesWithGroup
    * @param {string} rank
    */
-  function computeDiversitySummary(tree, samplesWithGroup, rank) {
+  function computeDiversitySummary(tree, samplesWithGroup, rank, filters = null) {
     const perSample = samplesWithGroup.map(({ id, group }) => ({
       id,
       group,
-      ...computeDiversity(tree, id, rank),
+      ...computeDiversity(tree, id, rank, filters),
     }));
 
     const byGroup = new Map();

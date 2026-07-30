@@ -73,4 +73,11 @@ test('computeDiversitySummary aggregates per group with mean and range', () => {
   assert.ok(soilAgg.richness.max >= soilAgg.richness.mean);
 });
 
+test('computeDiversity respects an exclusion filter (richness drops by exactly the excluded taxon)', () => {
+  const tree = loadTree();
+  const unfiltered = computeDiversity(tree, 'barcode39', 'S');
+  const filtered = computeDiversity(tree, 'barcode39', 'S', { exclusionTerms: ['Coccinella transversoguttata'] });
+  assert.strictEqual(filtered.richness, unfiltered.richness - 1);
+});
+
 report();

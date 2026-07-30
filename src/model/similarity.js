@@ -38,12 +38,12 @@
    * @param {string[]} sampleIds
    * @param {string} rank
    * @param {'bray-curtis'|'jaccard'} metric
-   * @param {{minAbundance?: number}} [options] - presence threshold, jaccard only
+   * @param {{minAbundance?: number, filters?: object}} [options] - minAbundance is the presence threshold, jaccard only
    * @returns {{sampleIds: string[], matrix: number[][]}} symmetric distance matrix, 0 diagonal
    */
   function computeDistanceMatrix(tree, sampleIds, rank, metric, options = {}) {
     const minAbundance = options.minAbundance ?? 1;
-    const { matrix: abundance, sampleIds: cols } = buildAbundanceMatrix(tree, sampleIds, rank);
+    const { matrix: abundance, sampleIds: cols } = buildAbundanceMatrix(tree, sampleIds, rank, { filters: options.filters });
 
     const columns = cols.map((_, colIdx) => abundance.map((row) => row[colIdx]));
     const n = columns.length;

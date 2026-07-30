@@ -84,4 +84,33 @@ test('bracken-only sample (leaf nodes at depth 0, no ancestor chain) still expos
   assert.strictEqual(rows.length, 454);
 });
 
+test('global exclusion filter removes a taxon and renormalizes percentages for the rest', () => {
+  const tree = new TaxonomyTree();
+  parseBreport(read('barcode39.breport'), tree, 'barcode39');
+  const unfiltered = computeRankTable(tree, 'barcode39', 'S');
+  const filtered = computeRankTable(tree, 'barcode39', 'S', '', { exclusionTerms: ['Coccinella transversoguttata'] });
+
+  assert.strictEqual(filtered.find((r) => r.taxid === 1790162), undefined);
+  assert.strictEqual(filtered.length, unfiltered.length - 1);
+
+  const nextTopRow = filtered.find((r) => r.taxid === 79060 || r.name === 'Cataglyphis aenescens');
+  const unfilteredNextTop = unfiltered.find((r) => r.name === 'Cataglyphis aenescens');
+  assert.ok(nextTopRow.pctOfTotal > unfilteredNextTop.pctOfTotal); // renormalized upward
+});
+
+test('global minimum-abundance filter narrows the table without renormalizing', () => {
+  const tree = new TaxonomyTree();
+  parseBreport(read('barcode39.breport'), tree, 'barcode39');
+  const filtered = computeRankTable(tree, 'barcode39', 'S', '', { minAbundance: { mode: 'pct', value: 1 } });
+  assert.ok(filtered.length < 454);
+  assert.ok(filtered.every((r) => r.pctOfTotal >= 1));
+});
+
+test('global filters and local search term compose (filters first, then local search narrows further)', () => {
+  const tree = new TaxonomyTree();
+  parseBreport(read('barcode39.breport'), tree, 'barcode39');
+  const rows = computeRankTable(tree, 'barcode39', 'S', 'coccinella', { exclusionTerms: ['Coccinella transversoguttata'] });
+  assert.strictEqual(rows.length, 0); // the only "coccinella" match was excluded
+});
+
 report();

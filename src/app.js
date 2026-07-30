@@ -22,6 +22,7 @@
   const { computeDistanceMatrix } = window.ClannEDNA.similarity;
   const { renderHeatmapSVG, sequentialColor, binaryColor } = window.ClannEDNA.heatmap;
   const { renderStackedBarSVG } = window.ClannEDNA.stackedBar;
+  const { parseExclusionList, matchesSearch } = window.ClannEDNA.filters;
   const parsers = { parseBreport, parseBracken, parseGeneric, captureProvenance };
 
   const folderInput = document.getElementById('folder-input');
@@ -190,6 +191,25 @@
   let activeSampleId = null;
   let groupNamesText = '';
 
+  // Global filters (PLAN.md Phase 7) — applied inside computeRankTable, so
+  // every view that reads through it (single-sample table, Top-N chart,
+  // and the whole multi-sample comparison section) recalculates
+  // consistently. See src/model/filters.js for the exclusion/threshold
+  // semantics. globalSearchText is separate and non-destructive: it only
+  // highlights matches, it never removes rows (the per-sample table's own
+  // search box, further down, still does that local filtering).
+  let exclusionListText = '';
+  let minAbundanceMode = 'pct';
+  let minAbundanceValue = 0;
+  let globalSearchText = '';
+
+  function currentFilters() {
+    return {
+      exclusionTerms: parseExclusionList(exclusionListText),
+      minAbundance: { mode: minAbundanceMode, value: minAbundanceValue },
+    };
+  }
+
   async function loadSelected() {
     const rows = Array.from(tickList.querySelectorAll('li'));
     const grouped = new Map(); // sampleName -> {breport?, bracken?, generic?}
@@ -348,6 +368,93 @@
     return section;
   }
 
+  // ---- Global filters + search (PLAN.md Phase 7) -----------------------
+
+  function focusPreservingInput(input, id, onCommit) {
+    input.addEventListener('input', () => {
+      const cursorPos = input.selectionStart;
+      onCommit(input.value);
+      renderResults();
+      const restored = document.getElementById(id);
+      if (restored) {
+        restored.focus();
+        restored.setSelectionRange(cursorPos, cursorPos);
+      }
+    });
+  }
+
+  function renderFiltersSection() {
+    if (run.samples.size === 0) return null;
+    const section = el('div', { className: 'viz-section filters-section' });
+    section.appendChild(el('h3', { text: 'Filters & search' }));
+
+    // Host/contaminant exclusion list
+    section.appendChild(
+      el('p', {
+        className: 'viz-breadcrumb',
+        text: 'Exclude known host/contaminant taxa (exact name or taxid, comma or newline separated) — removed from every view and every calculation, with the rest renormalized to 100%.',
+      })
+    );
+    const exclusionInput = el('textarea', {
+      id: 'exclusion-list-input',
+      rows: '2',
+      placeholder: 'e.g. Homo sapiens, Bos taurus',
+    });
+    exclusionInput.value = exclusionListText;
+    focusPreservingInput(exclusionInput, 'exclusion-list-input', (v) => {
+      exclusionListText = v;
+    });
+    section.appendChild(exclusionInput);
+
+    // Minimum abundance threshold
+    const thresholdRow = el('div', { className: 'filter-threshold-row' });
+    thresholdRow.appendChild(el('label', { text: 'Minimum abundance: ' }));
+    const modeSelect = el('select');
+    [
+      ['pct', '%'],
+      ['reads', 'reads'],
+    ].forEach(([value, label]) => {
+      const opt = el('option', { value, text: label });
+      opt.selected = value === minAbundanceMode;
+      modeSelect.appendChild(opt);
+    });
+    modeSelect.addEventListener('change', () => {
+      minAbundanceMode = modeSelect.value;
+      renderResults();
+    });
+    const valueInput = el('input', { type: 'number', min: '0', step: '0.1', value: String(minAbundanceValue) });
+    valueInput.addEventListener('change', () => {
+      minAbundanceValue = Math.max(0, Number(valueInput.value) || 0);
+      renderResults();
+    });
+    const resetBtn = el('button', { type: 'button', text: 'Reset' });
+    resetBtn.addEventListener('click', () => {
+      minAbundanceValue = 0;
+      minAbundanceMode = 'pct';
+      renderResults();
+    });
+    thresholdRow.appendChild(valueInput);
+    thresholdRow.appendChild(modeSelect);
+    thresholdRow.appendChild(resetBtn);
+    section.appendChild(thresholdRow);
+
+    // Global taxon search — highlights, never filters, across every open view.
+    const searchRow = el('div', { className: 'search-row' });
+    const searchInput = el('input', {
+      id: 'global-search-input',
+      type: 'search',
+      placeholder: 'Highlight a taxon by name or taxid across every view…',
+    });
+    searchInput.value = globalSearchText;
+    focusPreservingInput(searchInput, 'global-search-input', (v) => {
+      globalSearchText = v;
+    });
+    searchRow.appendChild(searchInput);
+    section.appendChild(searchRow);
+
+    return section;
+  }
+
   function renderSampleSelector() {
     const ids = [...run.samples.keys()];
     if (ids.length <= 1) return null;
@@ -412,7 +519,7 @@
       return computeGenericTable(sample.genericRows, currentSearch);
     }
     if (!currentRank) return [];
-    return computeRankTable(run.tree, sample.id, currentRank, currentSearch);
+    return computeRankTable(run.tree, sample.id, currentRank, currentSearch, currentFilters());
   }
 
   function renderRankControls(sample) {
@@ -472,13 +579,13 @@
     const tbody = el('tbody');
     const sorted = sortRows(rows, currentSort.column, currentSort.direction);
     sorted.forEach((row) => {
-      tbody.appendChild(
-        el('tr', {}, [
-          el('td', { text: row.name }),
-          el('td', { text: row.cladeReads.toLocaleString() }),
-          el('td', { text: `${row.pctOfTotal.toFixed(3)}%` }),
-        ])
-      );
+      const tr = el('tr', {}, [
+        el('td', { text: row.name }),
+        el('td', { text: row.cladeReads.toLocaleString() }),
+        el('td', { text: `${row.pctOfTotal.toFixed(3)}%` }),
+      ]);
+      if (matchesSearch(row.name, row.taxid, globalSearchText)) tr.classList.add('search-match');
+      tbody.appendChild(tr);
     });
     table.appendChild(tbody);
 
@@ -504,8 +611,9 @@
     const maxReads = top.length > 0 ? top[0].cladeReads : 0;
     const bars = el('div', { className: 'bar-list scroll-panel' });
 
-    const addBar = (label, reads, pct, cls) => {
-      const barRow = el('div', { className: `bar-row ${cls || ''}` });
+    const addBar = (label, reads, pct, cls, taxid) => {
+      const highlighted = matchesSearch(label, taxid, globalSearchText);
+      const barRow = el('div', { className: `bar-row ${cls || ''} ${highlighted ? 'search-match' : ''}` });
       barRow.appendChild(el('span', { className: 'bar-label', text: label }));
       const track = el('div', { className: 'bar-track' });
       const fill = el('div', { className: 'bar-fill' });
@@ -516,7 +624,7 @@
       bars.appendChild(barRow);
     };
 
-    top.forEach((row) => addBar(row.name, row.cladeReads, row.pctOfTotal));
+    top.forEach((row) => addBar(row.name, row.cladeReads, row.pctOfTotal, '', row.taxid));
     if (other) addBar(`Other (${other.count} taxa)`, other.cladeReads, other.pctOfTotal, 'bar-other');
 
     container.appendChild(bars);
@@ -551,6 +659,7 @@
 
     renderSunburstSVG(host, hierarchyRoot, {
       size: 460,
+      isHighlighted: (name, taxid) => matchesSearch(name, taxid, globalSearchText),
       onFocusChange: (focus) => {
         breadcrumb.textContent =
           focus.depth <= 0
@@ -610,7 +719,7 @@
       const data = computeSankeyData(run.tree, sample.id, rankRange);
       const width = Math.max(600, host.clientWidth || 700);
       const layout = computeSankeyLayout(data, { width, height: 420 });
-      renderSankeySVG(host, layout, { width, height: 420 });
+      renderSankeySVG(host, layout, { width, height: 420, isHighlighted: (name, taxid) => matchesSearch(name, taxid, globalSearchText) });
     }
 
     startSelect.addEventListener('change', () => {
@@ -754,7 +863,7 @@
 
     if (comparisonRank) {
       const samplesWithGroup = included.map((s) => ({ id: s.id, group: s.group || 'Unassigned' }));
-      const diversitySummary = computeDiversitySummary(run.tree, samplesWithGroup, comparisonRank);
+      const diversitySummary = computeDiversitySummary(run.tree, samplesWithGroup, comparisonRank, currentFilters());
       section.appendChild(renderDiversityPlot(diversitySummary, overviewMetric, groupNames));
     }
 
@@ -851,12 +960,15 @@
 
     const stackedHost = el('div', { className: 'stacked-bar-host' });
     section.appendChild(stackedHost);
-    const stackedData = computeStackedComposition(run.tree, sampleIds, comparisonRank, stackedBarTopN);
-    renderStackedBarSVG(stackedHost, stackedData, { sampleLabels: sampleGroupLabelFn(included) });
+    const stackedData = computeStackedComposition(run.tree, sampleIds, comparisonRank, stackedBarTopN, currentFilters());
+    renderStackedBarSVG(stackedHost, stackedData, {
+      sampleLabels: sampleGroupLabelFn(included),
+      isTaxonHighlighted: (name) => matchesSearch(name, null, globalSearchText),
+    });
 
     // Abundance heatmap
     section.appendChild(el('h4', { text: 'Abundance heatmap' }));
-    const abundanceMatrix = buildAbundanceMatrix(run.tree, sampleIds, comparisonRank);
+    const abundanceMatrix = buildAbundanceMatrix(run.tree, sampleIds, comparisonRank, { filters: currentFilters() });
     const cappedAbundance = {
       ...abundanceMatrix,
       taxa: abundanceMatrix.taxa.slice(0, heatmapMaxRows),
@@ -875,6 +987,7 @@
       colLabels: sampleIds.map(sampleGroupLabelFn(included)),
       matrix: cappedAbundance.matrix,
       colGroupColors,
+      isRowHighlighted: (name) => matchesSearch(name, null, globalSearchText),
     });
 
     // Presence/absence matrix
@@ -898,6 +1011,7 @@
       matrix: presenceAbsence.matrix,
       colorFn: binaryColor,
       colGroupColors,
+      isRowHighlighted: (name) => matchesSearch(name, null, globalSearchText),
     });
 
     // Small multiples sunburst
@@ -911,14 +1025,20 @@
       cell.appendChild(el('p', { className: 'small-multiple-label', text: sampleGroupLabelFn(included)(sample.id) }));
       const host = el('div', {});
       cell.appendChild(host);
-      renderSunburstSVG(host, hierarchyRoot, { size: 140, ringWidth: 12, centerR: 10, maxDepth: 5 });
+      renderSunburstSVG(host, hierarchyRoot, {
+        size: 140,
+        ringWidth: 12,
+        centerR: 10,
+        maxDepth: 5,
+        isHighlighted: (name, taxid) => matchesSearch(name, taxid, globalSearchText),
+      });
       smallMultiples.appendChild(cell);
     });
 
     // Diversity summary table
     section.appendChild(el('h4', { text: 'Diversity summary' }));
     const samplesWithGroup = included.map((s) => ({ id: s.id, group: s.group || 'Unassigned' }));
-    const diversitySummary = computeDiversitySummary(run.tree, samplesWithGroup, comparisonRank);
+    const diversitySummary = computeDiversitySummary(run.tree, samplesWithGroup, comparisonRank, currentFilters());
     const divTable = el('table', { className: 'rank-table' });
     const divHead = el('tr', {}, ['Sample', 'Group', 'Richness', 'Shannon', 'Simpson'].map((h) => el('th', { text: h })));
     divTable.appendChild(el('thead', {}, [divHead]));
@@ -968,7 +1088,10 @@
     metricRow.appendChild(metricSelect);
     section.appendChild(metricRow);
 
-    const distance = computeDistanceMatrix(run.tree, sampleIds, comparisonRank, similarityMetric, { minAbundance: presenceThreshold });
+    const distance = computeDistanceMatrix(run.tree, sampleIds, comparisonRank, similarityMetric, {
+      minAbundance: presenceThreshold,
+      filters: currentFilters(),
+    });
     const similarityHost = el('div', { className: 'heatmap-host scroll-panel' });
     section.appendChild(similarityHost);
     const labels = sampleIds.map(sampleGroupLabelFn(included));
@@ -992,6 +1115,9 @@
 
     const groupsSection = renderGroupsSection();
     if (groupsSection) resultsPanel.appendChild(groupsSection);
+
+    const filtersSection = renderFiltersSection();
+    if (filtersSection) resultsPanel.appendChild(filtersSection);
 
     const overviewSection = renderOverviewDashboard();
     if (overviewSection) resultsPanel.appendChild(overviewSection);

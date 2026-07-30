@@ -16,7 +16,7 @@
   /**
    * @param {HTMLElement} container
    * @param {{taxonNames: string[], series: Array<{sampleId: string, values: Array<{name:string, pct:number}>, otherPct: number}>}} data
-   * @param {{width?: number, height?: number, sampleLabels?: Record<string,string>}} [options]
+   * @param {{width?: number, height?: number, sampleLabels?: Record<string,string>, isTaxonHighlighted?: (name:string) => boolean}} [options]
    */
   function renderStackedBarSVG(container, data, options = {}) {
     const width = options.width ?? Math.max(500, data.series.length * 70);
@@ -26,6 +26,7 @@
     const chartTop = 10;
     const chartHeight = height - 70;
     const labelFn = options.sampleLabels || ((id) => id);
+    const isTaxonHighlighted = options.isTaxonHighlighted || null;
 
     container.innerHTML = '';
     const svg = document.createElementNS(STACKED_BAR_SVG_NS, 'svg');
@@ -48,6 +49,10 @@
         rect.setAttribute('width', barWidth);
         rect.setAttribute('height', segHeight);
         rect.setAttribute('fill', seg.name === 'Other' ? 'hsl(0, 0%, 60%)' : colorForTaxonName(seg.name));
+        if (isTaxonHighlighted && isTaxonHighlighted(seg.name)) {
+          rect.setAttribute('stroke', 'var(--accent)');
+          rect.setAttribute('stroke-width', '2');
+        }
         const title = document.createElementNS(STACKED_BAR_SVG_NS, 'title');
         title.textContent = `${seg.name}: ${seg.pct.toFixed(2)}%`;
         rect.appendChild(title);

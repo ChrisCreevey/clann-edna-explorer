@@ -4,6 +4,10 @@
 // Rank-by-rank breakdown table and Top-N bucketing for a single tree-backed
 // sample, plus the flat-row equivalent for generic-format samples.
 
+const { applyFilters } = typeof module !== 'undefined' && module.exports
+  ? require('./filters')
+  : window.ClannEDNA.filters;
+
 const RANK_ORDER = ['D', 'K', 'P', 'C', 'O', 'F', 'G', 'S'];
 
 /**
@@ -31,9 +35,18 @@ function computeAvailableRanks(tree, sampleId) {
 
 /**
  * Rows for every taxon at `rankLetter` present in `sampleId`, optionally
- * filtered by a case-insensitive name/taxid search term.
+ * narrowed by a case-insensitive local name/taxid search term.
+ *
+ * `filters` (see src/model/filters.js) is the *global* minimum-abundance
+ * threshold and host/contaminant exclusion list — applied first, before
+ * the local `searchTerm`, since every other view (Top-N chart, comparison
+ * heatmap/composition/diversity/similarity) reads through this same
+ * function and must see the same filtered/renormalized rows regardless of
+ * what's typed into any one table's own search box.
+ *
+ * @param {{minAbundance?: {mode: 'pct'|'reads', value: number}, exclusionTerms?: string[]}} [filters]
  */
-function computeRankTable(tree, sampleId, rankLetter, searchTerm = '') {
+function computeRankTable(tree, sampleId, rankLetter, searchTerm = '', filters = null) {
   if (NON_BREAKDOWN_RANKS.has(rankLetter)) return [];
   const term = searchTerm.trim().toLowerCase();
   const rows = [];
@@ -41,18 +54,19 @@ function computeRankTable(tree, sampleId, rankLetter, searchTerm = '') {
     if (tree.rankLetter[i] !== rankLetter || tree.rankSub[i] !== 0) continue;
     const counts = tree.perSample[i].get(sampleId);
     if (!counts) continue;
-    const taxid = tree.taxid[i];
-    const name = tree.name[i];
-    if (term && !name.toLowerCase().includes(term) && String(taxid) !== term) continue;
     rows.push({
-      taxid,
-      name,
+      taxid: tree.taxid[i],
+      name: tree.name[i],
       cladeReads: counts.cladeReads || 0,
       directReads: counts.directReads || 0,
       pctOfTotal: counts.pctOfTotal || 0,
     });
   }
-  return rows;
+
+  const { rows: filteredRows } = applyFilters(rows, filters);
+
+  if (!term) return filteredRows;
+  return filteredRows.filter((r) => r.name.toLowerCase().includes(term) || String(r.taxid) === term);
 }
 
 function sortRows(rows, sortBy, direction = 'desc') {

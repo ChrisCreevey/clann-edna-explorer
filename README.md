@@ -27,8 +27,23 @@ re-parse), and Phase 5 (overview dashboard with per-group run stats and a
 diversity plot; multi-sample comparison — stacked composition bar chart,
 abundance heatmap, presence/absence matrix, small-multiples sunburst,
 diversity summary table, Bray-Curtis/Jaccard sample-similarity matrix, all
-group-aware) are built. Later phases (filtering/search, metadata mapping
-and taxon tagging, staging exports) are not yet built — see `PLAN.md` §3.
+group-aware), and Phase 7 (global minimum-abundance filter and
+host/contaminant exclusion list — both applied centrally inside
+computeRankTable so every view that reads through it recalculates
+consistently; cross-view taxon search that highlights matches, rather than
+filtering, in the single-sample table, Top-N chart, stacked composition
+chart, abundance/presence heatmaps, sunburst, and Sankey) are built. Later
+phases (metadata mapping and taxon category tagging, staging exports) are
+not yet built — see `PLAN.md` §3.
+
+The exclusion list and abundance threshold apply to every rank-table-
+derived view (single-sample table, Top-N chart, comparison heatmaps,
+stacked composition, diversity, similarity) but *not* to the sunburst or
+Sankey hierarchy views — removing a taxon from a hierarchy correctly would
+mean subtracting its reads from every ancestor's clade total recursively,
+which those two views don't do yet. This is a deliberate v1 scope
+boundary, not an oversight; search highlighting (non-destructive) does
+apply to the hierarchy views since it doesn't require recomputing sums.
 
 NMDS/PCA ordination remains explicitly out of v1 scope (per PLAN.md's
 open-points resolution) — sample similarity is a distance-matrix heatmap,
@@ -70,7 +85,9 @@ src/model/              shared taxid-keyed taxonomy tree, sample builder,
                         indices (diversity.js), cross-sample abundance
                         matrix + presence/absence + stacked composition
                         (comparison.js), Bray-Curtis/Jaccard distance
-                        matrix (similarity.js)
+                        matrix (similarity.js), global abundance-threshold/
+                        exclusion-list filtering + search matching
+                        (filters.js)
 src/viz/                sunburst (Krona-style), Sankey (Pavian-style),
                         generic heatmap (heatmap.js — abundance,
                         presence/absence, and similarity all reuse it),

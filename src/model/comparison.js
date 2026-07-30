@@ -20,12 +20,12 @@
    * @param {import('./taxonomy-tree').TaxonomyTree} tree
    * @param {string[]} sampleIds
    * @param {string} rank
-   * @param {{valueField?: 'cladeReads'|'pctOfTotal'}} [options]
+   * @param {{valueField?: 'cladeReads'|'pctOfTotal', filters?: object}} [options]
    * @returns {{taxa: Array<{taxid:number,name:string,total:number}>, sampleIds: string[], matrix: number[][]}}
    */
   function buildAbundanceMatrix(tree, sampleIds, rank, options = {}) {
     const valueField = options.valueField || 'cladeReads';
-    const perSampleRows = sampleIds.map((id) => computeRankTable(tree, id, rank));
+    const perSampleRows = sampleIds.map((id) => computeRankTable(tree, id, rank, '', options.filters));
 
     const taxonMeta = new Map(); // taxid -> {taxid, name}
     perSampleRows.forEach((rows) => {
@@ -81,8 +81,8 @@
    *
    * @returns {{taxonNames: string[], series: Array<{sampleId: string, values: Array<{name: string, pct: number}>, otherPct: number}>}}
    */
-  function computeStackedComposition(tree, sampleIds, rank, maxTaxa = 10) {
-    const { taxa, matrix, sampleIds: cols } = buildAbundanceMatrix(tree, sampleIds, rank, { valueField: 'cladeReads' });
+  function computeStackedComposition(tree, sampleIds, rank, maxTaxa = 10, filters = null) {
+    const { taxa, matrix, sampleIds: cols } = buildAbundanceMatrix(tree, sampleIds, rank, { valueField: 'cladeReads', filters });
     const topTaxa = taxa.slice(0, maxTaxa);
     const topIndices = topTaxa.map((_, i) => i);
 
