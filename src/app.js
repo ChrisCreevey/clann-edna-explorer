@@ -34,11 +34,15 @@
   const parsers = { parseBreport, parseBracken, parseGeneric, captureProvenance };
 
   const folderInput = document.getElementById('folder-input');
-  const pickFolderBtn = document.getElementById('pick-folder-btn');
+  const uploadBtn = document.getElementById('uploadBtn');
+  const emptyOpenBtn = document.getElementById('emptyOpen');
   const tickList = document.getElementById('file-ticklist');
-  const emptyState = document.getElementById('load-empty-state');
+  const loadEmptyState = document.getElementById('load-empty-state');
   const loadBtn = document.getElementById('load-selected-btn');
-  const resultsPanel = document.getElementById('results-panel');
+  const explorerEl = document.getElementById('explorer');
+  const emptyEl = document.getElementById('empty');
+  const hTitle = document.getElementById('hTitle');
+  const hMeta = document.getElementById('hMeta');
 
   // Compressed inputs (.gz/.zip) are accepted per the brief but in-browser
   // decompression isn't wired up yet — flagged rather than silently
@@ -81,8 +85,9 @@
   function renderTickList(results) {
     currentResults = results;
     tickList.innerHTML = '';
-    emptyState.style.display = results.length === 0 ? 'block' : 'none';
-    loadBtn.style.display = results.some((r) => r.format !== 'unknown') ? 'inline-block' : 'none';
+    tickList.style.display = results.length === 0 ? 'none' : '';
+    loadEmptyState.style.display = results.length === 0 ? '' : 'none';
+    loadBtn.style.display = results.some((r) => r.format !== 'unknown') ? '' : 'none';
 
     results.forEach((result, index) => {
       const li = document.createElement('li');
@@ -173,25 +178,31 @@
     renderTickList(results);
   }
 
-  if (supportsFileSystemAccess()) {
-    pickFolderBtn.style.display = 'inline-block';
-    folderInput.style.display = 'none';
-    pickFolderBtn.addEventListener('click', async () => {
+  // A single "Choose folder…" affordance appears in two places (the header,
+  // always visible, and centered in the empty-state hero before anything is
+  // loaded) — both trigger the same picking logic.
+  async function chooseFolder() {
+    if (supportsFileSystemAccess()) {
       try {
         const files = await pickFolderFileSystemAccess();
         await handleFiles(files);
       } catch (err) {
         if (err.name !== 'AbortError') console.error(err);
       }
-    });
-  } else {
-    pickFolderBtn.style.display = 'none';
-    folderInput.style.display = 'inline-block';
+    } else {
+      folderInput.click();
+    }
+  }
+
+  if (!supportsFileSystemAccess()) {
     folderInput.addEventListener('change', async (event) => {
       const files = filesFromWebkitDirectoryInput(event.target.files);
       await handleFiles(files);
     });
   }
+
+  uploadBtn.addEventListener('click', chooseFolder);
+  emptyOpenBtn.addEventListener('click', chooseFolder);
 
   // ---- Loading selected files into samples --------------------------
 
@@ -287,6 +298,17 @@
     }
 
     activeSampleId = activeSampleId && run.samples.has(activeSampleId) ? activeSampleId : grouped.keys().next().value;
+
+    // Once a run is loaded, the tick-list has done its job — leaving it
+    // sitting there under "Choose folder…" is just clutter, so collapse
+    // it down to a one-line summary. "Choose folder…" (header or hero)
+    // still starts a fresh pick at any time.
+    tickList.innerHTML = '';
+    tickList.style.display = 'none';
+    loadBtn.style.display = 'none';
+    loadEmptyState.style.display = '';
+    loadEmptyState.textContent = `${run.samples.size} sample${run.samples.size === 1 ? '' : 's'} loaded. Choose a folder above to load more.`;
+
     renderResults();
   }
 
@@ -349,13 +371,19 @@
   }
 
   function renderGroupsSection() {
-    if (run.samples.size < 2) return null; // brief: no grouping UI for a single sample
+    if (run.samples.size < 2) {
+      // brief: no grouping UI for a single sample — still show a hint
+      // rather than an empty collapsible section.
+      return el('div', {
+        className: 'hint',
+        text: run.samples.size === 0 ? 'Load a run to assign sample groups.' : 'Load a second sample to assign groups.',
+      });
+    }
 
-    const section = el('div', { className: 'viz-section groups-section' });
-    section.appendChild(el('h3', { text: 'Sample groups' }));
+    const section = el('div', { className: 'groups-section' });
     section.appendChild(
       el('p', {
-        className: 'viz-breadcrumb',
+        className: 'hint',
         text: 'Type group names separated by commas, then assign each sample to one below. Excluded samples stay loaded but are left out of every calculation and view.',
       })
     );
@@ -425,24 +453,24 @@
     if (summary.excluded.length > 0) summaryParts.push(`excluded: ${summary.excluded.length}`);
     section.appendChild(el('p', { className: 'row-count', text: summaryParts.join(' · ') }));
 
-    section.appendChild(renderSampleMetadataSection());
-
     return section;
   }
 
   // ---- Sample metadata join + group pre-population (PLAN.md Phase 8) --
 
   function renderSampleMetadataSection() {
+    if (run.samples.size === 0) {
+      return el('div', { className: 'hint', text: 'Load a run to join sample metadata.' });
+    }
     const container = el('div', { className: 'sample-metadata-section' });
-    container.appendChild(el('h4', { text: 'Sample metadata' }));
     container.appendChild(
       el('p', {
-        className: 'viz-breadcrumb',
-        text: 'Upload a CSV/TSV: first column is the sample/barcode ID, any further columns are metadata fields. Matches are joined by exact ID — manual group assignment above always takes precedence over pre-populating from a column here.',
+        className: 'hint',
+        text: 'Upload a CSV/TSV: first column is the sample/barcode ID, any further columns are metadata fields. Matches are joined by exact ID — a manual group assignment in Sample groups always takes precedence over pre-populating from a column here.',
       })
     );
 
-    const fileInput = el('input', { type: 'file', accept: '.csv,.tsv,.txt' });
+    const fileInput = el('input', { type: 'file', accept: '.csv,.tsv,.txt', style: 'display:none' });
     fileInput.addEventListener('change', async () => {
       const file = fileInput.files[0];
       if (!file) return;
@@ -459,6 +487,9 @@
       }
       renderResults();
     });
+    const uploadBtnEl = el('button', { className: 'act', type: 'button', text: 'Upload sample metadata…' });
+    uploadBtnEl.addEventListener('click', () => fileInput.click());
+    container.appendChild(uploadBtnEl);
     container.appendChild(fileInput);
 
     if (metadataUploadError) {
@@ -479,7 +510,7 @@
         opt.selected = field === groupPrepopulateColumn;
         columnSelect.appendChild(opt);
       });
-      const applyBtn = el('button', { type: 'button', text: 'Pre-populate groups from this column' });
+      const applyBtn = el('button', { className: 'act', type: 'button', text: 'Pre-populate groups from this column' });
       applyBtn.addEventListener('click', () => {
         groupPrepopulateColumn = columnSelect.value;
         const values = new Set();
@@ -524,14 +555,15 @@
   }
 
   function renderFiltersSection() {
-    if (run.samples.size === 0) return null;
-    const section = el('div', { className: 'viz-section filters-section' });
-    section.appendChild(el('h3', { text: 'Filters & search' }));
+    if (run.samples.size === 0) {
+      return el('div', { className: 'hint', text: 'Load a run to filter and search.' });
+    }
+    const section = el('div', { className: 'filters-section' });
 
     // Host/contaminant exclusion list
     section.appendChild(
       el('p', {
-        className: 'viz-breadcrumb',
+        className: 'hint',
         text: 'Exclude known host/contaminant taxa (exact name or taxid, comma or newline separated) — removed from every view and every calculation, with the rest renormalized to 100%.',
       })
     );
@@ -567,7 +599,7 @@
       minAbundanceValue = Math.max(0, Number(valueInput.value) || 0);
       renderResults();
     });
-    const resetBtn = el('button', { type: 'button', text: 'Reset' });
+    const resetBtn = el('button', { className: 'act warn', type: 'button', text: 'Reset' });
     resetBtn.addEventListener('click', () => {
       minAbundanceValue = 0;
       minAbundanceMode = 'pct';
@@ -598,29 +630,30 @@
   // ---- Taxon category tagging (PLAN.md Phase 8) ------------------------
 
   function renderTaxonTagsSection() {
-    if (run.samples.size === 0) return null;
-    const section = el('div', { className: 'viz-section tags-section' });
-    section.appendChild(el('h3', { text: 'Taxon category tags' }));
+    if (run.samples.size === 0) {
+      return el('div', { className: 'hint', text: 'Load a run to tag taxa by category.' });
+    }
+    const section = el('div', { className: 'tags-section' });
     section.appendChild(
       el('p', {
-        className: 'viz-breadcrumb',
+        className: 'hint',
         text: 'Highlight taxa of interest (pathogens, indicator species, invasive species) consistently across the rank table, Top-N chart, sunburst, Sankey, and comparison heatmaps.',
       })
     );
 
-    const uploadRow = el('div', {});
-    uploadRow.appendChild(el('label', { text: 'Upload a taxon/taxid → category list (2 columns): ' }));
-    const fileInput = el('input', { type: 'file', accept: '.csv,.tsv,.txt' });
+    const fileInput = el('input', { type: 'file', accept: '.csv,.tsv,.txt', style: 'display:none' });
     fileInput.addEventListener('change', async () => {
       const file = fileInput.files[0];
       if (!file) return;
       taxonTagListText = await file.text();
       renderResults();
     });
-    uploadRow.appendChild(fileInput);
-    section.appendChild(uploadRow);
+    const uploadTagListBtn = el('button', { className: 'act', type: 'button', text: 'Upload tag list (taxon/taxid, category)…' });
+    uploadTagListBtn.addEventListener('click', () => fileInput.click());
+    section.appendChild(uploadTagListBtn);
+    section.appendChild(fileInput);
 
-    section.appendChild(el('p', { className: 'viz-breadcrumb', text: 'Or type keyword rules, one per line: keyword => category' }));
+    section.appendChild(el('p', { className: 'hint', text: 'Or type keyword rules, one per line: keyword => category' }));
     const keywordInput = el('textarea', {
       id: 'keyword-rules-input',
       rows: '2',
@@ -668,7 +701,7 @@
   }
 
   function renderSummaryCard(sample) {
-    const card = el('div', { className: 'summary-card' });
+    const card = el('div', { className: 'card summary-card' });
     card.appendChild(el('h3', { text: sample.displayName }));
 
     if (sample.kind === 'generic') {
@@ -803,7 +836,7 @@
       text: 'Verify in Clann BLAST Explorer ↗',
     });
     card.appendChild(
-      el('p', { className: 'viz-breadcrumb' }, [
+      el('p', { className: 'hint' }, [
         document.createTextNode('This tool has no raw reads to pass along — open '),
         blastLink,
         document.createTextNode(' and BLAST a representative read yourself to confirm this identification.'),
@@ -937,9 +970,9 @@
     const hierarchyRoot = buildHierarchyTree(run.tree, sample.id);
     if (!hierarchyRoot) return null;
 
-    const section = el('div', { className: 'viz-section' });
+    const section = el('div', { className: 'card' });
     section.appendChild(el('h3', { text: 'Taxonomic sunburst' }));
-    const breadcrumb = el('p', { className: 'viz-breadcrumb', text: 'root — click a segment to zoom in, click the centre to zoom out' });
+    const breadcrumb = el('p', { className: 'hint', text: 'root — click a segment to zoom in, click the centre to zoom out' });
     section.appendChild(breadcrumb);
     const host = el('div', { className: 'sunburst-host' });
     section.appendChild(host);
@@ -973,7 +1006,7 @@
     if (!sankeyStartRank || !ranks.includes(sankeyStartRank)) sankeyStartRank = ranks[0];
     if (!sankeyEndRank || !ranks.includes(sankeyEndRank)) sankeyEndRank = ranks[ranks.length - 1];
 
-    const section = el('div', { className: 'viz-section' });
+    const section = el('div', { className: 'card' });
     section.appendChild(el('h3', { text: 'Sankey: read flow through ranks' }));
 
     const controls = el('div', { className: 'sankey-controls' });
@@ -1100,7 +1133,7 @@
     if (included.length < 2) return null;
 
     const groupNames = currentGroupNames();
-    const section = el('div', { className: 'viz-section overview-dashboard' });
+    const section = el('div', { className: 'card overview-dashboard' });
     section.appendChild(el('h3', { text: 'Overview' }));
 
     // Run-level stats, per group when >1 group has samples.
@@ -1233,7 +1266,7 @@
     const sampleIds = included.map((s) => s.id);
     const colGroupColors = included.map((s) => colorForGroup(s.group, groupNames));
 
-    const section = el('div', { className: 'viz-section comparison-section' });
+    const section = el('div', { className: 'card comparison-section' });
     section.appendChild(el('h3', { text: 'Multi-sample comparison' }));
 
     const rankInfo = renderComparisonRankControl(sampleIds, renderResults);
@@ -1300,7 +1333,7 @@
       colorForCategory,
     });
     section.appendChild(createExportButtons(() => heatmapHost, 'abundance-heatmap'));
-    const abundanceCsvBtn = el('button', { type: 'button', text: 'Export full matrix as CSV' });
+    const abundanceCsvBtn = el('button', { className: 'act', type: 'button', text: 'Export full matrix as CSV' });
     abundanceCsvBtn.addEventListener('click', () => {
       const groupBySampleId = Object.fromEntries(included.map((s) => [s.id, s.group || '']));
       downloadTextFile(`abundance-matrix-${comparisonRank}.csv`, abundanceMatrixToCsv(abundanceMatrix, groupBySampleId));
@@ -1387,7 +1420,7 @@
     }
     divTable.appendChild(divBody);
     section.appendChild(el('div', { className: 'table-wrap scroll-panel' }, [divTable]));
-    const diversityCsvBtn = el('button', { type: 'button', text: 'Export diversity summary as CSV' });
+    const diversityCsvBtn = el('button', { className: 'act', type: 'button', text: 'Export diversity summary as CSV' });
     diversityCsvBtn.addEventListener('click', () => {
       downloadTextFile(`diversity-summary-${comparisonRank}.csv`, diversitySummaryToCsv(diversitySummary));
     });
@@ -1430,7 +1463,7 @@
       cellHeight: 16,
     });
     section.appendChild(createExportButtons(() => similarityHost, `similarity-${similarityMetric}`));
-    const similarityCsvBtn = el('button', { type: 'button', text: 'Export distance matrix as CSV' });
+    const similarityCsvBtn = el('button', { className: 'act', type: 'button', text: 'Export distance matrix as CSV' });
     similarityCsvBtn.addEventListener('click', () => {
       downloadTextFile(`similarity-${similarityMetric}-${comparisonRank}.csv`, distanceMatrixToCsv(distance));
     });
@@ -1447,7 +1480,7 @@
     section.appendChild(el('h4', { text: 'Export for MicrobiomeAnalyst' }));
     section.appendChild(
       el('p', {
-        className: 'viz-breadcrumb',
+        className: 'hint',
         text: 'Three files built to the MicrobiomeAnalyst data format, reflecting exactly the samples, rank, and filters currently shown above (excluded samples and filtered-out taxa are not included).',
       })
     );
@@ -1489,7 +1522,7 @@
       ['metadata.txt', exportResult.metadataText, 'Metadata'],
     ];
     files.forEach(([filename, text, label]) => {
-      const btn = el('button', { type: 'button', className: 'primary', text: `Download ${label}` });
+      const btn = el('button', { type: 'button', className: 'act', text: `Download ${label}` });
       btn.addEventListener('click', () => downloadTextFile(filename, text));
       downloadRow.appendChild(btn);
     });
@@ -1499,81 +1532,89 @@
   }
 
   function renderResults() {
-    if (run.samples.size === 0) return;
-    resultsPanel.innerHTML = '';
-    resultsPanel.appendChild(el('h2', { text: 'Results' }));
+    // The four collapsible sidebar sections are always present (matching
+    // Pangenome Explorer's shell) — each renders its own "load a run
+    // first" hint when empty, rather than the whole section disappearing.
+    const groupsBody = document.getElementById('groupsSectionBody');
+    groupsBody.innerHTML = '';
+    groupsBody.appendChild(renderGroupsSection());
 
-    const groupsSection = renderGroupsSection();
-    if (groupsSection) resultsPanel.appendChild(groupsSection);
+    const filtersBody = document.getElementById('filtersSectionBody');
+    filtersBody.innerHTML = '';
+    filtersBody.appendChild(renderFiltersSection());
 
-    const filtersSection = renderFiltersSection();
-    if (filtersSection) resultsPanel.appendChild(filtersSection);
+    const tagsBody = document.getElementById('tagsSectionBody');
+    tagsBody.innerHTML = '';
+    tagsBody.appendChild(renderTaxonTagsSection());
 
-    const tagsSection = renderTaxonTagsSection();
-    if (tagsSection) resultsPanel.appendChild(tagsSection);
+    const metadataBody = document.getElementById('metadataSectionBody');
+    metadataBody.innerHTML = '';
+    metadataBody.appendChild(renderSampleMetadataSection());
+
+    if (run.samples.size === 0) {
+      explorerEl.style.display = 'none';
+      emptyEl.style.display = '';
+      hTitle.textContent = '';
+      hMeta.textContent = '';
+      return;
+    }
+    explorerEl.style.display = '';
+    emptyEl.style.display = 'none';
+    hTitle.textContent = `${run.samples.size} sample${run.samples.size === 1 ? '' : 's'}`;
+
+    explorerEl.innerHTML = '';
 
     const overviewSection = renderOverviewDashboard();
-    if (overviewSection) resultsPanel.appendChild(overviewSection);
+    if (overviewSection) explorerEl.appendChild(overviewSection);
 
     const comparisonSection = renderComparisonSection();
-    if (comparisonSection) resultsPanel.appendChild(comparisonSection);
+    if (comparisonSection) explorerEl.appendChild(comparisonSection);
 
     const selector = renderSampleSelector();
-    if (selector) resultsPanel.appendChild(selector);
+    if (selector) explorerEl.appendChild(selector);
 
     const sample = run.samples.get(activeSampleId);
-    resultsPanel.appendChild(renderSummaryCard(sample));
+    hMeta.textContent = `active: ${sample.id}`;
+    explorerEl.appendChild(renderSummaryCard(sample));
 
     if (sample.kind !== 'generic') {
       const sunburstSection = renderSunburstSection(sample);
-      if (sunburstSection) resultsPanel.appendChild(sunburstSection);
+      if (sunburstSection) explorerEl.appendChild(sunburstSection);
 
       const sankeySection = renderSankeySection(sample);
-      if (sankeySection) resultsPanel.appendChild(sankeySection);
+      if (sankeySection) explorerEl.appendChild(sankeySection);
 
       const rankControls = renderRankControls(sample);
-      if (rankControls) resultsPanel.appendChild(rankControls);
+      if (rankControls) explorerEl.appendChild(rankControls);
     }
-    resultsPanel.appendChild(renderSearchBox());
-    resultsPanel.appendChild(el('div', { id: 'topn-chart-host' }));
-    resultsPanel.appendChild(el('div', { id: 'rank-table-host' }));
+    explorerEl.appendChild(renderSearchBox());
+    explorerEl.appendChild(el('div', { id: 'topn-chart-host' }));
+    explorerEl.appendChild(el('div', { id: 'rank-table-host' }));
 
     if (sample.kind !== 'generic') {
-      const csvBtn = el('button', { type: 'button', className: 'diagram-export-row-btn', text: 'Export table as CSV' });
+      const csvBtn = el('button', { type: 'button', className: 'act', text: 'Export table as CSV' });
       csvBtn.addEventListener('click', () => {
         const csv = rankTableToCsv(getTableRows(sample), sample.id, sample.group);
         downloadTextFile(`${sample.id}-rank-table.csv`, csv);
       });
-      resultsPanel.appendChild(el('div', { className: 'diagram-export-row' }, [csvBtn]));
+      explorerEl.appendChild(el('div', { className: 'diagram-export-row' }, [csvBtn]));
     }
 
     renderTableAndChart();
   }
 
-  // ---- Theme toggle: cycles system -> light -> dark -> system --------
-  const themeToggle = document.getElementById('theme-toggle');
+  // ---- Theme toggle: light <-> dark (shell-level, active before load) --
+  const themeBtn = document.getElementById('themeBtn');
   const THEME_KEY = 'clann-edna-theme';
 
-  function applyTheme(theme) {
-    if (theme === 'system') {
-      document.documentElement.removeAttribute('data-theme');
-    } else {
-      document.documentElement.setAttribute('data-theme', theme);
-    }
-    themeToggle.textContent = theme === 'system' ? 'Theme: Auto' : theme === 'dark' ? 'Theme: Dark' : 'Theme: Light';
+  const storedTheme = localStorage.getItem(THEME_KEY);
+  if (storedTheme === 'light' || storedTheme === 'dark') {
+    document.documentElement.dataset.theme = storedTheme;
   }
-
-  function nextTheme(current) {
-    if (current === 'system') return 'light';
-    if (current === 'light') return 'dark';
-    return 'system';
-  }
-
-  let currentTheme = localStorage.getItem(THEME_KEY) || 'system';
-  applyTheme(currentTheme);
-  themeToggle.addEventListener('click', () => {
-    currentTheme = nextTheme(currentTheme);
-    localStorage.setItem(THEME_KEY, currentTheme);
-    applyTheme(currentTheme);
+  themeBtn.addEventListener('click', () => {
+    const root = document.documentElement;
+    const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    root.dataset.theme = next;
+    localStorage.setItem(THEME_KEY, next);
   });
 })();

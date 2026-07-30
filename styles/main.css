@@ -1,920 +1,285 @@
-:root {
+/* Design tokens and shell layout ported verbatim from
+   clann-pangenome-explorer/styles/pangenome.css so all four Clann tools
+   share one visual language. Component-specific rules below adapt this
+   app's existing UI (sunburst, Sankey, heatmaps, comparison views, etc.)
+   to the same tokens. */
+:root{
+  --font-sans:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace;
+
+  --stone-50:#FAF6EE; --stone-100:#F3ECDF; --stone-200:#E7DBC6; --stone-300:#D5C4A6;
+  --stone-400:#B7A283; --stone-500:#8E7A5E; --stone-600:#6A5A43; --stone-700:#4B4031;
+  --stone-800:#2E2820; --stone-900:#1A160F;
+  --clay-400:#C56347; --clay-500:#A94B2E; --clay-600:#8C3A22;
+  --moss-300:#9CAA6A; --moss-500:#5F6E33;
+  --compute-200:#7FCFC4; --compute-400:#149589; --compute-500:#0B7268; --compute-glow:#36E0C8;
+  --amber-400:#D99A2B; --amber-500:#B97E1C;
+
+  --bg:var(--stone-50); --panel:#ffffff; --ink:var(--stone-900); --muted:var(--stone-600); --line:var(--stone-300);
+  --accent:var(--compute-500); --sel:var(--compute-500); --hl:var(--amber-400); --warn:var(--clay-500);
+  --shadow-sm:0 1px 3px rgba(46,40,32,.08),0 1px 2px rgba(46,40,32,.05);
+  --shadow-md:0 8px 22px rgba(46,40,32,.16);
   color-scheme: light dark;
-
-  --bg: #ffffff;
-  --bg-alt: #f4f5f7;
-  --text: #1a1d21;
-  --text-muted: #5b6169;
-  --border: #d8dce1;
-  --accent: #2d6a4f;
-  --accent-contrast: #ffffff;
-  --danger: #b3261e;
 }
-
+:root[data-theme="dark"]{
+  --bg:var(--stone-900); --panel:var(--stone-800); --ink:var(--stone-50); --muted:var(--stone-400); --line:var(--stone-700);
+  --accent:var(--compute-glow); --sel:var(--compute-glow); --hl:var(--amber-400); --warn:var(--clay-400);
+  --shadow-sm:0 1px 3px rgba(0,0,0,.35); --shadow-md:0 10px 26px rgba(0,0,0,.42);
+}
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #15171a;
-    --bg-alt: #1e2126;
-    --text: #e8e9eb;
-    --text-muted: #9aa0a8;
-    --border: #33373d;
-    --accent: #6fcf97;
-    --accent-contrast: #0d1210;
-    --danger: #ff6b60;
+  :root:not([data-theme="light"]) {
+    --bg:var(--stone-900); --panel:var(--stone-800); --ink:var(--stone-50); --muted:var(--stone-400); --line:var(--stone-700);
+    --accent:var(--compute-glow); --sel:var(--compute-glow); --hl:var(--amber-400); --warn:var(--clay-400);
+    --shadow-sm:0 1px 3px rgba(0,0,0,.35); --shadow-md:0 10px 26px rgba(0,0,0,.42);
   }
 }
 
-:root[data-theme='light'] {
-  --bg: #ffffff;
-  --bg-alt: #f4f5f7;
-  --text: #1a1d21;
-  --text-muted: #5b6169;
-  --border: #d8dce1;
-  --accent: #2d6a4f;
-  --accent-contrast: #ffffff;
-  --danger: #b3261e;
-}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font:13px/1.45 var(--font-sans);
+     color:var(--ink);background:var(--bg);display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
 
-:root[data-theme='dark'] {
-  --bg: #15171a;
-  --bg-alt: #1e2126;
-  --text: #e8e9eb;
-  --text-muted: #9aa0a8;
-  --border: #33373d;
-  --accent: #6fcf97;
-  --accent-contrast: #0d1210;
-  --danger: #ff6b60;
-}
+/* ---- Header ---- */
+header{display:flex;align-items:center;gap:14px;padding:9px 14px;border-bottom:1px solid var(--line);
+  background:var(--panel);border-top:3px solid var(--clay-500)}
+header .brand{font-weight:700;text-transform:uppercase;letter-spacing:.03em;font-size:13px;
+  color:var(--clay-500);white-space:nowrap}
+:root[data-theme="dark"] header .brand{color:var(--clay-400)}
+header nav{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header nav a{color:var(--muted);text-decoration:none;font-size:12.5px;white-space:nowrap}
+header nav a:hover{color:var(--accent)}
+header .spacer{flex:1}
+header #uploadBtn{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;
+  padding:5px 11px;cursor:pointer;font:inherit;font-size:12.5px}
+header #uploadBtn:hover{border-color:var(--accent);color:var(--accent)}
+button.act#themeBtn{width:auto;border:1px solid var(--line);background:var(--bg);color:var(--ink);
+  border-radius:6px;padding:5px 9px;cursor:pointer;font:inherit;font-size:14px;line-height:1}
+button.act#themeBtn:hover{border-color:var(--accent)}
 
-* {
-  box-sizing: border-box;
-}
+/* ---- Shell layout ---- */
+main{flex:1;display:flex;min-height:0;min-width:0}
 
-html,
-body {
-  margin: 0;
-  padding: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-}
+#side{width:300px;flex:none;border-right:1px solid var(--line);background:var(--panel);
+      overflow:auto;padding:12px}
+#side h4{margin:16px 0 7px;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+  font-family:var(--font-mono);font-weight:500}
+#side h4:first-child{margin-top:0}
 
-body {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-}
+.sect{border-top:1px solid var(--line);margin-top:14px}
+.sect>summary{list-style:none;cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px;
+  margin:12px 0 7px;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+  font-family:var(--font-mono);font-weight:500}
+.sect>summary::-webkit-details-marker{display:none}
+.sect>summary::before{content:"▸";font-size:9px;color:var(--muted);transition:transform 120ms}
+.sect[open]>summary::before{transform:rotate(90deg)}
+.sect>summary:hover{color:var(--ink)}
+.sect>*:last-child{margin-bottom:4px}
 
-header.site-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1.25rem;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-alt);
-}
+.row{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:12.5px}
+.row label{flex:1;user-select:none}
 
-header.site-header h1 {
-  font-size: 1.1rem;
-  margin: 0;
-}
+input[type=search],input[type=text],input[type=number],textarea,select{width:100%;padding:5px 7px;border:1px solid var(--line);
+  border-radius:6px;background:var(--bg);color:var(--ink);font:inherit;font-size:12.5px}
+input[type=search]:focus-visible,input[type=text]:focus-visible,input[type=number]:focus-visible,
+textarea:focus-visible,select:focus-visible,button:focus-visible{outline:none;
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--compute-400) 35%, transparent);border-color:var(--compute-400)}
 
-header.site-header nav a {
-  color: var(--text-muted);
-  text-decoration: none;
-  margin-left: 1rem;
-  font-size: 0.9rem;
-}
+button{font:inherit}
+button.act{width:100%;padding:6px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);
+  color:var(--ink);cursor:pointer;margin:4px 0;font:inherit;font-size:12.5px;transition:border-color 140ms,transform 80ms}
+button.act:hover{border-color:var(--accent)}
+button.act:active{transform:translateY(1px)}
+button.act:disabled{opacity:.45;cursor:default;border-color:var(--line)}
+button.act.warn{color:var(--warn);border-color:var(--warn)}
+button.act.warn:hover{background:var(--warn);color:#fff}
 
-header.site-header nav a:hover {
-  color: var(--accent);
-}
+.hint{color:var(--muted);font-size:11px;margin-top:7px;line-height:1.45}
+code{background:var(--panel);border:1px solid var(--line);padding:0.05rem 0.3rem;border-radius:3px;
+  font-family:var(--font-mono);font-size:0.9em}
 
-main.layout {
-  flex: 1;
-  display: grid;
-  grid-template-columns: minmax(260px, 320px) 1fr;
-  gap: 1rem;
-  padding: 1rem;
-  min-width: 0;
-}
+#wrap{flex:1;position:relative;overflow:auto;background:var(--bg)}
+
+#empty{position:absolute;inset:0;overflow-y:auto;color:var(--muted);text-align:center;background:var(--bg)}
+#empty .hero{min-height:70%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:14px;padding:24px;box-sizing:border-box}
+#empty h1{margin:0;color:var(--ink);font-size:24px;letter-spacing:.01em}
+#empty .lead{max-width:640px;line-height:1.5}
+#empty .exts{font-family:var(--font-mono);font-size:12px}
+#empty button{border:1px solid var(--accent);color:var(--accent);background:transparent;border-radius:7px;
+  padding:8px 16px;cursor:pointer;font:inherit;font-size:13px}
+#empty button:hover{background:var(--accent);color:#fff}
+:root[data-theme="dark"] #empty button:hover{color:var(--stone-900)}
+#empty .scroll-hint{font-size:12px;opacity:.55;margin-top:6px}
+
+#explorer{padding:14px;display:flex;flex-direction:column;gap:14px;min-height:100%}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;box-shadow:var(--shadow-sm)}
+.card h3{margin:0 0 8px;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+  font-family:var(--font-mono);font-weight:500}
+.card h4{margin:14px 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+  font-family:var(--font-mono);font-weight:500}
+.card h4:first-child{margin-top:0}
+
+/* ---- About & FAQ (inside #empty, matching the sibling tools) ---- */
+.about{max-width:760px;margin:0 auto;padding:4px 30px 64px;text-align:left;line-height:1.62;
+  border-top:1px solid var(--line)}
+.about h2{color:var(--ink);font-size:19px;margin:30px 0 8px}
+.about h2:first-child{margin-top:0}
+.about h3{color:var(--ink);font-size:14.5px;margin:20px 0 4px}
+.about p{margin:0 0 10px;font-size:13.5px;color:var(--muted)}
+.about a{color:var(--accent);text-decoration:none}
+.about a:hover{text-decoration:underline}
+.about-foot{margin-top:26px;font-size:12.5px;opacity:.85}
+
+/* ---- Footer ---- */
+footer#foot{flex:none;display:flex;align-items:center;gap:10px;padding:6px 14px;border-top:1px solid var(--line);
+  background:var(--panel);font-size:12px;color:var(--muted);flex-wrap:wrap}
+footer#foot strong{color:var(--ink);font-weight:600}
+footer#foot .sep{margin:0 7px;opacity:.5}
+footer#foot a{color:var(--accent);text-decoration:none}
+footer#foot a:hover{text-decoration:underline}
+footer#foot .foot-r{margin-left:auto;display:flex;align-items:center;gap:12px}
+footer#foot .like{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:6px;
+  padding:3px 9px;background:var(--bg);color:var(--ink)}
+footer#foot .like:hover{border-color:var(--accent);text-decoration:none}
+footer#foot .like .like-ico{color:var(--amber-400)}
+
+/* ---- Tables (generic data-table look, used by rank-table etc) ---- */
+table.data-table{width:100%;border-collapse:collapse;font-size:12.5px}
+table.data-table th,table.data-table td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+table.data-table th{cursor:pointer;user-select:none;color:var(--muted);font-family:var(--font-mono);font-size:11px;
+  text-transform:uppercase;letter-spacing:.04em;position:sticky;top:0;background:var(--panel)}
+table.data-table th:hover{color:var(--ink)}
+table.data-table th.sorted-asc::after{content:" ▴"}
+table.data-table th.sorted-desc::after{content:" ▾"}
+table.data-table tbody tr:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+table.data-table td.num{font-family:var(--font-mono);text-align:right}
+
+.table-wrap{overflow:auto}
+/* Reusable cap for any long list/table so it scrolls internally instead of
+   pushing the rest of the page down. */
+.scroll-panel{max-height:22rem;overflow-y:auto;overflow-x:auto;border:1px solid var(--line);border-radius:6px}
+.table-wrap.scroll-panel table.data-table thead th{position:sticky;top:0;background:var(--panel);z-index:1}
 
 /* Grid/flex children default to min-width:auto, which refuses to shrink
    below their content's intrinsic width — the classic cause of a whole
-   page growing horizontally instead of one internal element scrolling.
-   Reset it down this container chain so .scroll-panel's overflow-x:auto
-   actually clips+scrolls instead of the page growing around it. */
-main.layout > *,
-.panel,
-.viz-section,
-.bar-row,
-.diversity-row {
-  min-width: 0;
-}
-
-@media (max-width: 800px) {
-  main.layout {
-    grid-template-columns: 1fr;
-  }
-}
-
-section.panel {
-  background: var(--bg-alt);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1rem;
-}
-
-.load-panel h2,
-.results-panel h2 {
-  margin-top: 0;
-  font-size: 1rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.empty-state {
-  color: var(--text-muted);
-  font-size: 0.95rem;
-}
-
-.file-ticklist {
-  list-style: none;
-  margin: 0.5rem 0;
-  padding: 0;
-  font-size: 0.9rem;
-}
-
-.file-ticklist li {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  padding: 0.35rem 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.file-ticklist li[data-disabled='true'] {
-  color: var(--text-muted);
-}
-
-.file-ticklist .format-label {
-  font-size: 0.75rem;
-  padding: 0.05rem 0.4rem;
-  border-radius: 4px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-}
-
-.file-ticklist .reason {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-button,
-input[type='file'] {
-  font: inherit;
-}
-
-button.primary {
-  background: var(--accent);
-  color: var(--accent-contrast);
-  border: none;
-  border-radius: 6px;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-}
-
-footer.site-footer {
-  padding: 1rem 1.25rem;
-  border-top: 1px solid var(--border);
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  display: flex;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-footer.site-footer a {
-  color: inherit;
-}
-
-footer.site-footer .foot-r {
-  display: flex;
-  gap: 1rem;
-}
-
-footer.site-footer .sep {
-  opacity: 0.5;
-}
-
-/* ---- About & FAQ ---- */
-
-.about {
-  max-width: 56rem;
-  margin: 0 auto;
-  padding: 2rem 1.25rem;
-  border-top: 1px solid var(--border);
-}
-
-.about h2 {
-  font-size: 1.1rem;
-  margin: 1.5rem 0 0.75rem 0;
-}
-
-.about h2:first-child {
-  margin-top: 0;
-}
-
-.about h3 {
-  font-size: 0.95rem;
-  margin: 1rem 0 0.3rem 0;
-}
-
-.about p {
-  line-height: 1.5;
-  color: var(--text-muted);
-  margin: 0 0 0.75rem 0;
-}
-
-.about a {
-  color: var(--accent);
-}
-
-.about code {
-  background: var(--bg-alt);
-  padding: 0.05rem 0.3rem;
-  border-radius: 3px;
-}
-
-/* ---- Tick-list additions (sample naming, column mapping) ---- */
-
-.sample-name-input {
-  width: 8rem;
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.15rem 0.35rem;
-  font-size: 0.85rem;
-}
-
-.filename {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.column-mapping {
-  width: 100%;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding-top: 0.25rem;
-}
-
-.column-mapping input[type='number'] {
-  width: 3.5rem;
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.1rem 0.3rem;
-}
-
-.column-mapping button {
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.15rem 0.5rem;
-  cursor: pointer;
-}
-
-/* ---- Results panel ---- */
-
-.results-panel h2 {
-  margin-top: 0;
-  font-size: 1rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.sample-selector-row,
-.rank-controls,
-.search-row,
-.topn-controls {
-  margin-bottom: 0.75rem;
-  font-size: 0.9rem;
-}
-
-.sample-selector-row select,
-.rank-controls select,
-.search-row input,
-.topn-controls input {
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.3rem 0.5rem;
-  font-size: 0.9rem;
-}
-
-.search-row input {
-  width: 100%;
-  max-width: 24rem;
-}
-
-.summary-card {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.75rem 1rem;
-  margin-bottom: 1rem;
-}
-
-.summary-card h3 {
-  margin: 0 0 0.5rem 0;
-}
-
-.stat-grid {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  column-gap: 0.75rem;
-  row-gap: 0.25rem;
-  margin: 0;
-}
-
-.stat-grid dt {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-}
-
-.stat-grid dd {
-  margin: 0;
-  font-size: 0.85rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.provenance-details {
-  margin-top: 0.75rem;
-  font-size: 0.85rem;
-}
-
-.provenance-details summary {
-  cursor: pointer;
-  color: var(--text-muted);
-}
-
-/* Reusable cap for any long list/table so it scrolls internally instead of
-   pushing the rest of the page down. Apply to new long lists/tables as the
-   site grows (heatmaps, taxon lists, comparison tables, etc). */
-.scroll-panel {
-  max-height: 22rem;
-  overflow-y: auto;
-  overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-}
-
-.table-wrap {
-  overflow-x: auto;
-}
-
-.bar-list.scroll-panel {
-  padding: 0.5rem;
-}
-
-.table-wrap.scroll-panel table.rank-table thead th {
-  position: sticky;
-  top: 0;
-  background: var(--bg-alt);
-  z-index: 1;
-}
-
-.row-count {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  margin: 0 0 0.35rem 0;
-}
-
-table.rank-table {
-  border-collapse: collapse;
-  width: 100%;
-  font-size: 0.85rem;
-}
-
-table.rank-table th,
-table.rank-table td {
-  text-align: left;
-  padding: 0.35rem 0.6rem;
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-}
-
-table.rank-table th {
-  cursor: pointer;
-  color: var(--text-muted);
-  user-select: none;
-}
-
-table.rank-table th.sorted-asc::after {
-  content: ' \2191';
-}
-
-table.rank-table th.sorted-desc::after {
-  content: ' \2193';
-}
-
-table.rank-table td:nth-child(2),
-table.rank-table td:nth-child(3) {
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-
-.topn-chart {
-  margin-bottom: 1rem;
-}
-
-.bar-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.bar-row {
-  display: grid;
-  grid-template-columns: minmax(8rem, 16rem) 1fr minmax(9rem, max-content);
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8rem;
-}
-
-.bar-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.bar-track {
-  background: var(--border);
-  border-radius: 3px;
-  height: 0.85rem;
-  overflow: hidden;
-}
-
-.bar-fill {
-  background: var(--accent);
-  height: 100%;
-}
-
-.bar-other .bar-fill {
-  background: var(--text-muted);
-}
-
-.bar-value {
-  font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
-  text-align: right;
-}
-
-/* ---- Sunburst / Sankey (Phase 3) ---- */
-
-.viz-section {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.75rem 1rem;
-  margin-bottom: 1rem;
-}
-
-.viz-section h3 {
-  margin: 0 0 0.5rem 0;
-  font-size: 0.95rem;
-}
-
-.viz-breadcrumb {
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  margin: 0 0 0.5rem 0;
-}
-
-.sunburst-host {
-  display: flex;
-  justify-content: center;
-}
-
-.sunburst-host svg path {
-  transition: opacity 0.1s;
-}
-
-.sunburst-host svg path:hover {
-  opacity: 0.8;
-}
-
-.sankey-controls {
-  font-size: 0.85rem;
-  margin-bottom: 0.5rem;
-}
-
-.sankey-controls select {
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.2rem 0.4rem;
-}
-
-.sankey-host {
-  overflow-x: auto;
-}
-
-/* ---- Sample groups (Phase 4) ---- */
-
-.group-name-input-row {
-  margin-bottom: 0.6rem;
-}
-
-.group-name-input-row input {
-  width: 100%;
-  max-width: 28rem;
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.35rem 0.5rem;
-  font-size: 0.9rem;
-}
-
-.sample-group-list {
-  list-style: none;
-  margin: 0 0 0.5rem 0;
-  padding: 0.25rem 0.5rem;
-  max-height: 12rem;
-}
-
-.sample-group-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.3rem 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.85rem;
-}
-
-.sample-group-row:last-child {
-  border-bottom: none;
-}
-
-.sample-group-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sample-group-row select {
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.2rem 0.4rem;
-  font-size: 0.85rem;
-}
-
-/* ---- Overview dashboard + multi-sample comparison (Phase 5) ---- */
-
-.comparison-section h4,
-.overview-dashboard h4 {
-  margin: 1rem 0 0.4rem 0;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.overview-controls {
-  margin-bottom: 0.5rem;
-  font-size: 0.85rem;
-}
-
-.overview-controls select {
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.2rem 0.4rem;
-}
-
-table.overview-stats-table {
-  border-collapse: collapse;
-  width: 100%;
-  font-size: 0.85rem;
-  margin-bottom: 0.75rem;
-}
-
-table.overview-stats-table th,
-table.overview-stats-table td {
-  text-align: left;
-  padding: 0.3rem 0.6rem;
-  border-bottom: 1px solid var(--border);
-}
-
-table.overview-stats-table th {
-  color: var(--text-muted);
-  font-weight: normal;
-}
-
-.diversity-plot {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  margin-top: 0.5rem;
-}
-
-.diversity-row {
-  display: grid;
-  grid-template-columns: minmax(6rem, 10rem) 1fr minmax(9rem, max-content);
-  align-items: center;
-  gap: 0.6rem;
-  font-size: 0.8rem;
-}
-
-.diversity-group-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.diversity-track {
-  position: relative;
-  height: 1.4rem;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-}
-
-.diversity-range {
-  position: absolute;
-  top: 45%;
-  height: 2px;
-  background: var(--text-muted);
-}
-
-.diversity-mean {
-  position: absolute;
-  top: 15%;
-  width: 2px;
-  height: 70%;
-  background: var(--text);
-  transform: translateX(-1px);
-}
-
-.diversity-dot {
-  position: absolute;
-  top: 50%;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  border: 1px solid var(--bg);
-}
-
-.diversity-value {
-  font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
-  text-align: right;
-}
-
-.stacked-bar-host,
-.heatmap-host {
-  overflow-x: auto;
-}
-
-.heatmap-host.scroll-panel {
-  max-height: 26rem;
-}
-
-.small-multiples {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.small-multiple-cell {
-  width: 150px;
-  text-align: center;
-}
-
-.small-multiple-label {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  margin: 0.25rem 0 0 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-tr.diversity-aggregate-row td {
-  font-weight: bold;
-  border-top: 2px solid var(--border);
-}
-
-/* ---- Filters & search (Phase 7) ---- */
-
-.filters-section textarea {
-  width: 100%;
-  max-width: 32rem;
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.4rem 0.5rem;
-  font: inherit;
-  font-size: 0.85rem;
-  resize: vertical;
-  margin-bottom: 0.6rem;
-  display: block;
-}
-
-.filter-threshold-row {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-bottom: 0.6rem;
-  font-size: 0.9rem;
-}
-
-.filter-threshold-row input[type='number'] {
-  width: 5rem;
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.25rem 0.4rem;
-}
-
-.filter-threshold-row select {
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.25rem 0.4rem;
-}
-
-.filter-threshold-row button {
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.25rem 0.6rem;
-  cursor: pointer;
-}
-
-/* Non-destructive cross-view search highlight — table rows, Top-N bars,
-   and (via stroke, applied inline by the SVG renderers themselves)
-   heatmap cells, sunburst segments, Sankey nodes, and stacked-bar
-   segments all use this same visual language: an accent-coloured left
-   border / outline, not a full background fill, so it reads clearly on
-   both light and dark themes without fighting the data's own colour. */
-table.rank-table tr.search-match {
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
-}
-
-table.rank-table tr.search-match td:first-child {
-  border-left: 3px solid var(--accent);
-}
-
-.bar-row.search-match .bar-label {
-  color: var(--accent);
-  font-weight: bold;
-}
-
-.bar-row.search-match .bar-track {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-/* ---- MicrobiomeAnalyst export ---- */
-
-.export-warnings {
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
-  border: 1px solid var(--danger);
-  border-radius: 6px;
-  padding: 0.5rem 0.75rem;
-  margin-bottom: 0.6rem;
-  font-size: 0.85rem;
-}
-
-.export-warnings p {
-  margin: 0.2rem 0;
-}
-
-.export-download-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-}
-
-/* ---- Sample metadata + taxon category tags (Phase 8) ---- */
-
-.sample-metadata-section {
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--border);
-}
-
-.sample-metadata-section h4,
-.tags-section h4 {
-  margin: 0 0 0.4rem 0;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.tag-badge {
-  display: inline-block;
-  margin-left: 0.4rem;
-  padding: 0.05rem 0.4rem;
-  border: 1px solid;
-  border-radius: 999px;
-  font-size: 0.7rem;
-  color: var(--text);
-}
-
-.tag-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-top: 0.5rem;
-}
-
-.tag-chip {
-  padding: 0.1rem 0.5rem;
-  border: 1.5px solid;
-  border-radius: 999px;
-  font-size: 0.75rem;
-}
-
-/* ---- Diagram PNG/SVG export (Phase 9) ---- */
-
-.diagram-export-row {
-  display: flex;
-  gap: 0.4rem;
-  margin-top: 0.4rem;
-}
-
-.diagram-export-row button {
-  background: var(--bg);
-  color: var(--text-muted);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.2rem 0.5rem;
-  font-size: 0.75rem;
-  cursor: pointer;
-}
-
-.diagram-export-row button:hover {
-  color: var(--text);
-  border-color: var(--text-muted);
-}
-
-/* ---- Per-taxon detail card (Phase 9) ---- */
-
-table.rank-table tr.expandable-row {
-  cursor: pointer;
-}
-
-table.rank-table tr.expandable-row:hover {
-  background: var(--bg-alt);
-}
-
-tr.taxon-detail-row td {
-  background: var(--bg-alt);
-  padding: 0;
-}
-
-.taxon-detail-card {
-  padding: 0.75rem 1rem;
-}
-
-.taxon-detail-title {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.3rem;
-}
-
-.taxon-detail-lineage {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  margin: 0 0 0.6rem 0;
-}
+   page growing horizontally instead of one internal element scrolling. */
+main > *, #wrap, #explorer, .card, .bar-row, .diversity-row{min-width:0}
+
+.row-count{color:var(--muted);font-size:11.5px;margin:0 0 6px 0}
+.empty-state{color:var(--muted);font-size:12.5px}
+.empty-note{color:var(--muted);font-style:italic;padding:12px}
+
+@media (max-width: 760px){
+  main{flex-direction:column;overflow:auto}
+  #side{width:100% !important;max-height:60vh;border-right:none;border-bottom:1px solid var(--line)}
+  #wrap{overflow:visible;min-height:60vh}
+  header{flex-wrap:wrap;row-gap:6px}
+}
+
+/* =====================================================================
+   Component-specific rules (this app's own views), same tokens as above
+   ===================================================================== */
+
+/* ---- Load-a-run tick-list (inside #side, above the .sect blocks) ---- */
+.file-ticklist{list-style:none;margin:0.5rem 0;padding:0;font-size:12px}
+.file-ticklist li{display:flex;flex-wrap:wrap;align-items:baseline;gap:0.4rem;padding:0.35rem 0;border-bottom:1px solid var(--line)}
+.file-ticklist li[data-disabled='true']{color:var(--muted)}
+.file-ticklist .format-label{font-size:0.7rem;padding:0.05rem 0.4rem;border-radius:4px;background:var(--bg);border:1px solid var(--line)}
+.file-ticklist .reason{font-size:0.7rem;color:var(--muted)}
+.sample-name-input{width:7rem;font-size:0.8rem}
+.filename{font-size:0.75rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.column-mapping{width:100%;font-size:0.75rem;color:var(--muted);display:flex;align-items:center;gap:0.5rem;padding-top:0.25rem}
+.column-mapping input[type='number']{width:3.5rem}
+.column-mapping button{width:auto}
+
+/* ---- Sample groups / Filters / Tags / Metadata (aside .sect bodies) ---- */
+.group-name-input-row{margin-bottom:0.5rem}
+.sample-group-list{list-style:none;margin:0 0 0.5rem 0;padding:0;max-height:12rem}
+.sample-group-row{display:flex;align-items:center;justify-content:space-between;gap:0.5rem;padding:0.3rem 0;
+  border-bottom:1px solid var(--line);font-size:12px}
+.sample-group-row:last-child{border-bottom:none}
+.sample-group-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.sample-group-row select{width:auto;max-width:8rem}
+.filter-threshold-row{display:flex;align-items:center;gap:0.4rem;margin:0.4rem 0;font-size:12.5px}
+.filter-threshold-row input[type='number']{width:5rem}
+.filter-threshold-row select{width:auto}
+.filter-threshold-row button{width:auto}
+.tag-legend{display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.5rem}
+.tag-chip{padding:0.1rem 0.5rem;border:1.5px solid;border-radius:999px;font-size:0.7rem}
+.tag-badge{display:inline-block;margin-left:0.4rem;padding:0.05rem 0.4rem;border:1px solid;border-radius:999px;
+  font-size:0.65rem;color:var(--ink)}
+.topn-controls,.search-row,.rank-controls,.sample-selector-row,.sankey-controls{margin-bottom:0.6rem;font-size:12.5px}
+.search-row input{max-width:24rem}
+
+/* ---- Summary card ---- */
+.summary-card h3{margin:0 0 0.5rem 0;font-size:13px}
+.stat-grid{display:grid;grid-template-columns:max-content 1fr;column-gap:0.75rem;row-gap:0.25rem;margin:0}
+.stat-grid dt{color:var(--muted);font-size:12px}
+.stat-grid dd{margin:0;font-size:12px;font-variant-numeric:tabular-nums}
+.provenance-details{margin-top:0.75rem;font-size:12px}
+.provenance-details summary{cursor:pointer;color:var(--muted)}
+
+/* ---- Rank table + Top-N chart ---- */
+table.rank-table{width:100%;border-collapse:collapse;font-size:12.5px}
+table.rank-table th,table.rank-table td{text-align:left;padding:0.35rem 0.6rem;border-bottom:1px solid var(--line);white-space:nowrap}
+table.rank-table th{cursor:pointer;color:var(--muted);user-select:none;position:sticky;top:0;background:var(--panel);
+  font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+table.rank-table th.sorted-asc::after{content:' \2191'}
+table.rank-table th.sorted-desc::after{content:' \2193'}
+table.rank-table td:nth-child(2),table.rank-table td:nth-child(3){font-variant-numeric:tabular-nums;text-align:right;font-family:var(--font-mono)}
+table.rank-table tr.expandable-row{cursor:pointer}
+table.rank-table tr.expandable-row:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+tr.taxon-detail-row td{background:var(--bg);padding:0}
+.taxon-detail-card{padding:0.75rem 1rem}
+.taxon-detail-title{display:flex;align-items:center;gap:0.5rem;margin-bottom:0.3rem}
+.taxon-detail-lineage{color:var(--muted);font-size:12px;margin:0 0 0.6rem 0}
+
+.topn-chart{margin-bottom:0.5rem}
+.bar-list{display:flex;flex-direction:column;gap:0.3rem}
+.bar-row{display:grid;grid-template-columns:minmax(8rem, 16rem) 1fr minmax(9rem, max-content);align-items:center;gap:0.5rem;font-size:12px}
+.bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-track{background:var(--line);border-radius:3px;height:0.85rem;overflow:hidden}
+.bar-fill{background:var(--accent);height:100%}
+.bar-other .bar-fill{background:var(--muted)}
+.bar-value{font-variant-numeric:tabular-nums;color:var(--muted);text-align:right;font-family:var(--font-mono)}
+
+/* ---- Sunburst / Sankey ---- */
+.viz-breadcrumb{color:var(--muted);font-size:11.5px;margin:0 0 0.5rem 0}
+.sunburst-host{display:flex;justify-content:center}
+.sunburst-host svg path{transition:opacity 0.1s}
+.sunburst-host svg path:hover{opacity:0.8}
+.sankey-host{overflow-x:auto}
+
+/* ---- Overview dashboard + multi-sample comparison ---- */
+table.overview-stats-table{border-collapse:collapse;width:100%;font-size:12.5px;margin-bottom:0.75rem}
+table.overview-stats-table th,table.overview-stats-table td{text-align:left;padding:0.3rem 0.6rem;border-bottom:1px solid var(--line)}
+table.overview-stats-table th{color:var(--muted);font-weight:normal;font-family:var(--font-mono);font-size:11px;text-transform:uppercase}
+.overview-controls{margin-bottom:0.5rem;font-size:12.5px}
+.diversity-plot{display:flex;flex-direction:column;gap:0.6rem;margin-top:0.5rem}
+.diversity-row{display:grid;grid-template-columns:minmax(6rem, 10rem) 1fr minmax(9rem, max-content);align-items:center;gap:0.6rem;font-size:12px}
+.diversity-group-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.diversity-track{position:relative;height:1.4rem;background:var(--bg);border:1px solid var(--line);border-radius:4px}
+.diversity-range{position:absolute;top:45%;height:2px;background:var(--muted)}
+.diversity-mean{position:absolute;top:15%;width:2px;height:70%;background:var(--ink);transform:translateX(-1px)}
+.diversity-dot{position:absolute;top:50%;width:8px;height:8px;border-radius:50%;transform:translate(-50%, -50%);border:1px solid var(--panel)}
+.diversity-value{font-variant-numeric:tabular-nums;color:var(--muted);text-align:right;font-family:var(--font-mono)}
+.stacked-bar-host,.heatmap-host{overflow-x:auto}
+.heatmap-host.scroll-panel{max-height:26rem}
+.small-multiples{display:flex;flex-wrap:wrap;gap:0.75rem}
+.small-multiple-cell{width:150px;text-align:center}
+.small-multiple-label{font-size:11px;color:var(--muted);margin:0.25rem 0 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+tr.diversity-aggregate-row td{font-weight:bold;border-top:2px solid var(--line)}
+
+/* Non-destructive cross-view search highlight */
+table.rank-table tr.search-match{background:color-mix(in srgb, var(--accent) 15%, transparent)}
+table.rank-table tr.search-match td:first-child{border-left:3px solid var(--accent)}
+.bar-row.search-match .bar-label{color:var(--accent);font-weight:bold}
+.bar-row.search-match .bar-track{outline:2px solid var(--accent);outline-offset:1px}
+
+/* ---- Warnings (MicrobiomeAnalyst export etc) ---- */
+.export-warnings{background:color-mix(in srgb, var(--warn) 12%, transparent);border:1px solid var(--warn);
+  border-radius:6px;padding:0.5rem 0.75rem;margin-bottom:0.6rem;font-size:12.5px;color:var(--ink)}
+.export-warnings p{margin:0.2rem 0}
+.export-download-row,.diagram-export-row{display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.5rem}
+.export-download-row button,.diagram-export-row button{width:auto}

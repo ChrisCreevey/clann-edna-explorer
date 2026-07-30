@@ -9,7 +9,13 @@ tab-delimited fallback for other classifiers). Part of the
 and [Clann Pangenome Explorer](https://chriscreevey.github.io/clann-pangenome-explorer/).
 
 Vanilla HTML/CSS/JavaScript, no build step, no external dependencies.
-Hosted on GitHub Pages. GPL-2.0.
+Hosted on GitHub Pages. GPL-2.0. UI shell (header/sidebar/footer, colour
+tokens, component styles) matches
+[Clann Pangenome Explorer](https://chriscreevey.github.io/clann-pangenome-explorer/)
+exactly: collapsible `<details class="sect">` sections in a left sidebar
+for Sample groups/Filters & search/Taxon category tags/Sample metadata, a
+centered "Choose folder…" empty state, and the same stone/clay/compute
+colour palette in both themes.
 
 See [`clann-edna-explorer-brief.md`](clann-edna-explorer-brief.md) for the
 full design brief and [`PLAN.md`](PLAN.md) for the phased implementation

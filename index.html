@@ -55,40 +55,64 @@
   </script>
 </head>
 <body>
-  <header class="site-header">
-    <h1>Clann eDNA Explorer</h1>
-    <nav>
-      <a href="https://chriscreevey.github.io/clann-tree-viewer/">Tree Viewer</a>
-      <a href="https://chriscreevey.github.io/clann-blast-explorer/">BLAST Explorer</a>
-      <a href="https://chriscreevey.github.io/clann-pangenome-explorer/">Pangenome Explorer</a>
-      <a href="#about">About &amp; FAQ</a>
-      <button id="theme-toggle" type="button">Theme: Auto</button>
-    </nav>
+<div id="app" style="display:flex;flex-direction:column;flex:1;min-height:0">
+  <header>
+    <span class="brand">Clann eDNA Explorer</span>
+    <span class="title" id="hTitle"></span>
+    <span class="meta" id="hMeta"></span>
+    <span class="spacer"></span>
+    <button id="uploadBtn" type="button" title="Point at a folder of Kraken2/Bracken output">Choose folder&hellip;</button>
+    <input id="folder-input" type="file" webkitdirectory directory multiple style="display: none;" />
+    <button class="act" id="themeBtn" type="button" title="Toggle light/dark">&#9680;</button>
   </header>
 
-  <main class="layout">
-    <section class="panel load-panel">
-      <h2>Load a run</h2>
-      <p class="empty-state">
+  <main>
+    <aside id="side">
+      <h4>Load a run</h4>
+      <div class="hint" id="load-empty-state">
         Point at a folder containing your Kraken2/Bracken output (<code>.bracken</code> / <code>.breport</code> files,
         any names). Files are identified by content, not filename or extension.
-      </p>
+      </div>
+      <ul id="file-ticklist" class="file-ticklist scroll-panel" style="display: none;"></ul>
+      <button id="load-selected-btn" class="act" type="button" style="display: none;">Load selected</button>
 
-      <button id="pick-folder-btn" class="primary" type="button" style="display: none;">Choose folder&hellip;</button>
-      <input id="folder-input" type="file" webkitdirectory directory multiple style="display: none;" />
+      <details class="sect" id="rowGroups" open>
+        <summary>Sample groups</summary>
+        <div id="groupsSectionBody"></div>
+      </details>
 
-      <ul id="file-ticklist" class="file-ticklist scroll-panel"></ul>
-      <p id="load-empty-state" class="empty-state">No files loaded yet.</p>
-      <button id="load-selected-btn" class="primary" type="button" style="display: none;">Load selected</button>
-    </section>
+      <details class="sect" id="rowFilters">
+        <summary>Filters &amp; search</summary>
+        <div id="filtersSectionBody"></div>
+      </details>
 
-    <section id="results-panel" class="panel results-panel">
-      <h2>Results</h2>
-      <p class="empty-state">Load a run to see per-sample summaries, visualisations, and comparisons here.</p>
-    </section>
-  </main>
+      <details class="sect" id="rowTags">
+        <summary>Taxon category tags</summary>
+        <div id="tagsSectionBody"></div>
+      </details>
 
-  <section id="about" class="about">
+      <details class="sect" id="rowMetadata">
+        <summary>Sample metadata</summary>
+        <div id="metadataSectionBody"></div>
+      </details>
+    </aside>
+
+    <div id="wrap">
+      <div id="explorer" style="display: none;"></div>
+      <div id="empty">
+        <div class="hero">
+          <h1>Clann eDNA Explorer</h1>
+          <div class="lead">
+            A free, browser-based explorer for Kraken2/Bracken eDNA metabarcoding results. Point it at a folder
+            of <code>.breport</code>/<code>.bracken</code> output — any names, identified by content — to see
+            per-sample summaries, a Krona-style sunburst, a Pavian-style Sankey diagram, and, once a full run is
+            loaded, group-aware multi-sample comparison. Everything runs locally; nothing is uploaded to a server.
+          </div>
+          <div class="exts">.bracken &middot; .breport &middot; generic CSV/TSV</div>
+          <button id="emptyOpen" type="button">Choose folder&hellip;</button>
+          <div class="scroll-hint">&darr; About &amp; FAQ</div>
+        </div>
+        <section class="about" id="about">
     <h2>About Clann eDNA Explorer</h2>
     <p>
       <strong>Clann eDNA Explorer</strong> is a free, open-source tool for exploring taxonomic classification
@@ -166,21 +190,32 @@
       the <a href="https://github.com/chriscreevey/clann-edna-explorer" target="_blank" rel="noopener">repository</a>
       and host it yourself.
     </p>
-  </section>
+    <p class="about-foot">
+      Developed by <a href="https://www.creeveylab.org/" target="_blank" rel="noopener">CreeveyLab</a> ·
+      <a href="https://github.com/chriscreevey/clann-edna-explorer" target="_blank" rel="noopener">source on GitHub</a> ·
+      part of the <a href="https://chriscreevey.github.io/">Clann suite</a>, alongside
+      <a href="https://chriscreevey.github.io/clann-tree-viewer/" target="_blank" rel="noopener">Clann Tree Viewer</a>,
+      <a href="https://chriscreevey.github.io/clann-blast-explorer/" target="_blank" rel="noopener">Clann BLAST Explorer</a>,
+      and <a href="https://chriscreevey.github.io/clann-pangenome-explorer/" target="_blank" rel="noopener">Clann Pangenome Explorer</a>.
+    </p>
+        </section>
+      </div>
+      <div class="err" id="err" style="display: none;"></div>
+    </div>
+  </main>
 
-  <footer class="site-footer">
+  <footer id="foot">
     <span class="foot-l">
-      <strong>Clann eDNA Explorer</strong><span class="sep"> · </span>developed by
+      <strong>Clann eDNA Explorer</strong><span class="sep">&middot;</span>developed by
       <a href="https://www.creeveylab.org/" target="_blank" rel="noopener">CreeveyLab</a>
-      <span class="sep"> · </span>part of the <a href="https://chriscreevey.github.io/">Clann suite</a>
-      <span class="sep"> · </span>GPL-2.0
     </span>
     <span class="foot-r">
       <a href="https://github.com/chriscreevey/clann-edna-explorer/issues/new/choose" target="_blank" rel="noopener" title="Suggest a feature or report a problem (opens GitHub — a free account is needed to post)">Feedback</a>
       <a href="https://github.com/chriscreevey/clann-edna-explorer" target="_blank" rel="noopener" title="Source code on GitHub">GitHub</a>
-      <a href="https://github.com/chriscreevey/clann-edna-explorer" target="_blank" rel="noopener" title="Like it? Star the repository on GitHub">★ Star on GitHub</a>
+      <a class="like" href="https://github.com/chriscreevey/clann-edna-explorer" target="_blank" rel="noopener" title="Like it? Star the repository on GitHub"><span class="like-ico">&#9733;</span> Like it?</a>
     </span>
   </footer>
+</div>
 
   <script src="src/parsers/sniff.js"></script>
   <script src="src/parsers/breport.js"></script>
