@@ -185,3 +185,217 @@ footer.site-footer {
 footer.site-footer a {
   color: inherit;
 }
+
+/* ---- Tick-list additions (sample naming, column mapping) ---- */
+
+.sample-name-input {
+  width: 8rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.15rem 0.35rem;
+  font-size: 0.85rem;
+}
+
+.filename {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.column-mapping {
+  width: 100%;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 0.25rem;
+}
+
+.column-mapping input[type='number'] {
+  width: 3.5rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.1rem 0.3rem;
+}
+
+.column-mapping button {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.15rem 0.5rem;
+  cursor: pointer;
+}
+
+/* ---- Results panel ---- */
+
+.results-panel h2 {
+  margin-top: 0;
+  font-size: 1rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sample-selector-row,
+.rank-controls,
+.search-row,
+.topn-controls {
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.sample-selector-row select,
+.rank-controls select,
+.search-row input,
+.topn-controls input {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.9rem;
+}
+
+.search-row input {
+  width: 100%;
+  max-width: 24rem;
+}
+
+.summary-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.summary-card h3 {
+  margin: 0 0 0.5rem 0;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 0.75rem;
+  row-gap: 0.25rem;
+  margin: 0;
+}
+
+.stat-grid dt {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.stat-grid dd {
+  margin: 0;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.provenance-details {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.provenance-details summary {
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.row-count {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin: 0 0 0.35rem 0;
+}
+
+table.rank-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.85rem;
+}
+
+table.rank-table th,
+table.rank-table td {
+  text-align: left;
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+table.rank-table th {
+  cursor: pointer;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+table.rank-table th.sorted-asc::after {
+  content: ' \2191';
+}
+
+table.rank-table th.sorted-desc::after {
+  content: ' \2193';
+}
+
+table.rank-table td:nth-child(2),
+table.rank-table td:nth-child(3) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.topn-chart {
+  margin-bottom: 1rem;
+}
+
+.bar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 16rem) 1fr minmax(9rem, max-content);
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.bar-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-track {
+  background: var(--border);
+  border-radius: 3px;
+  height: 0.85rem;
+  overflow: hidden;
+}
+
+.bar-fill {
+  background: var(--accent);
+  height: 100%;
+}
+
+.bar-other .bar-fill {
+  background: var(--text-muted);
+}
+
+.bar-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  text-align: right;
+}

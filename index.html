@@ -31,9 +31,10 @@
 
       <ul id="file-ticklist" class="file-ticklist"></ul>
       <p id="load-empty-state" class="empty-state">No files loaded yet.</p>
+      <button id="load-selected-btn" class="primary" type="button" style="display: none;">Load selected</button>
     </section>
 
-    <section class="panel results-panel">
+    <section id="results-panel" class="panel results-panel">
       <h2>Results</h2>
       <p class="empty-state">Load a run to see per-sample summaries, visualisations, and comparisons here.</p>
     </section>
@@ -51,6 +52,9 @@
   <script src="src/parsers/provenance.js"></script>
   <script src="src/parsers/folder-loader.js"></script>
   <script src="src/model/taxonomy-tree.js"></script>
+  <script src="src/model/sample.js"></script>
+  <script src="src/model/summary.js"></script>
+  <script src="src/model/rank-table.js"></script>
   <script src="src/app.js"></script>
 </body>
 </html>

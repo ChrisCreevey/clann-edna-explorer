@@ -17,10 +17,11 @@ plan and Phase 1 investigation findings.
 
 ## Status
 
-Phase 1 (investigation, data model, parsers, folder-based loading) and the
-site skeleton are scaffolded. Later phases (single-sample visualisation,
-multi-sample comparison, diversity/similarity, exports) are not yet built —
-see `PLAN.md` §3.
+Phase 1 (investigation, data model, parsers, folder-based loading) and
+Phase 2 (single-sample parsing, read-summary card, rank-by-rank table,
+Top-N bar chart, generic fallback with manual column mapping) are built.
+Later phases (Krona/Sankey visualisation, multi-sample comparison,
+diversity/similarity, exports) are not yet built — see `PLAN.md` §3.
 
 ## Running locally
 
@@ -49,8 +50,10 @@ index.html            entry point
 styles/main.css        theme-aware (light/dark) stylesheet
 src/parsers/           .bracken / .breport / generic parsers, content sniffer,
                         provenance capture, folder loader
-src/model/              shared taxid-keyed taxonomy tree
-src/app.js              UI wiring (folder loading, tick-list, theme toggle)
+src/model/              shared taxid-keyed taxonomy tree, sample builder,
+                        read-summary stats, rank-table/Top-N computation
+src/app.js              UI wiring (folder loading, tick-list, sample loading,
+                        summary card, rank table, Top-N chart, theme toggle)
 test/                    zero-dependency test harness + tests
 test/fixtures/           real example files used by the test suite
 examples/                trimmed example run for the hosted demo
