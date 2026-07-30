@@ -242,6 +242,17 @@ function renderSankeySVG(container, layout, { width, height, isHighlighted = nul
   svg.appendChild(linkGroup);
 
   const nodeGroup = document.createElementNS(SANKEY_SVG_NS, 'g');
+  const labelGroup = document.createElementNS(SANKEY_SVG_NS, 'g');
+
+  // Every node gets a label, including ones too short for the label to fit
+  // centred on the bar — otherwise raising "max taxa shown per rank" adds
+  // bars with no visible name. Labels are pushed down within their column
+  // (nodes are visited top-to-bottom already) to keep a minimum gap from
+  // the previous label, and a thin leader line ties an offset label back
+  // to its bar so it's still clear which name belongs to which segment.
+  const labelMinGap = 11;
+  const lastLabelYByRank = new Map();
+
   layout.nodes.forEach((n) => {
     const rect = document.createElementNS(SANKEY_SVG_NS, 'rect');
     rect.setAttribute('x', n.x);
@@ -258,17 +269,33 @@ function renderSankeySVG(container, layout, { width, height, isHighlighted = nul
     rect.appendChild(title);
     nodeGroup.appendChild(rect);
 
-    if (n.y1 - n.y0 > 9) {
-      const label = document.createElementNS(SANKEY_SVG_NS, 'text');
-      label.setAttribute('x', n.x + layout.nodeWidth + 4);
-      label.setAttribute('y', (n.y0 + n.y1) / 2 + 3);
-      label.setAttribute('font-size', '10');
-      label.setAttribute('fill', 'var(--text)');
-      label.textContent = n.name;
-      nodeGroup.appendChild(label);
+    const barCenterY = (n.y0 + n.y1) / 2;
+    const desiredLabelY = barCenterY + 3;
+    const lastY = lastLabelYByRank.get(n.rank);
+    const labelY = lastY !== undefined && desiredLabelY < lastY + labelMinGap ? lastY + labelMinGap : desiredLabelY;
+    lastLabelYByRank.set(n.rank, labelY);
+
+    if (labelY - 3 !== barCenterY) {
+      const leader = document.createElementNS(SANKEY_SVG_NS, 'line');
+      leader.setAttribute('x1', n.x + layout.nodeWidth);
+      leader.setAttribute('y1', barCenterY);
+      leader.setAttribute('x2', n.x + layout.nodeWidth + 4);
+      leader.setAttribute('y2', labelY - 3);
+      leader.setAttribute('stroke', 'var(--muted)');
+      leader.setAttribute('stroke-width', '0.5');
+      labelGroup.appendChild(leader);
     }
+
+    const label = document.createElementNS(SANKEY_SVG_NS, 'text');
+    label.setAttribute('x', n.x + layout.nodeWidth + 4);
+    label.setAttribute('y', labelY);
+    label.setAttribute('font-size', '10');
+    label.setAttribute('fill', 'var(--text)');
+    label.textContent = n.name;
+    labelGroup.appendChild(label);
   });
   svg.appendChild(nodeGroup);
+  svg.appendChild(labelGroup);
 
   container.appendChild(svg);
 }
