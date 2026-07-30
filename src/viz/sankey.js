@@ -209,16 +209,51 @@ function computeSankeyLayout(data, { width, height, nodeWidth = 16, nodePadding 
   };
 }
 
+/**
+ * Where each node's label should be drawn, and how tall the canvas needs
+ * to be to fit all of them. Every node gets a label, including ones too
+ * short to fit one centred on the bar — otherwise raising "max taxa shown
+ * per rank" adds bars with no visible name. Labels are pushed down within
+ * their column (nodes arrive top-to-bottom already, per
+ * computeSankeyLayout) to keep a minimum gap from the previous label.
+ * Pulled out as a pure function (no DOM) so the canvas-growth behaviour is
+ * unit-testable, and so renderSankeySVG can size the SVG before drawing
+ * anything — a column with many small bars packed near the bottom would
+ * otherwise get its last few labels clipped by a fixed-height viewBox.
+ *
+ * @param {Array<{taxid, rank, y0, y1}>} nodes
+ * @param {number} height - the diagram's nominal height, used as a floor
+ * @param {{labelMinGap?: number, bottomPadding?: number}} [options]
+ */
+function computeSankeyLabelLayout(nodes, height, { labelMinGap = 11, bottomPadding = 6 } = {}) {
+  const lastLabelYByRank = new Map();
+  const labelYByTaxid = new Map();
+  let maxLabelY = height;
+  nodes.forEach((n) => {
+    const barCenterY = (n.y0 + n.y1) / 2;
+    const desiredLabelY = barCenterY + 3;
+    const lastY = lastLabelYByRank.get(n.rank);
+    const labelY = lastY !== undefined && desiredLabelY < lastY + labelMinGap ? lastY + labelMinGap : desiredLabelY;
+    lastLabelYByRank.set(n.rank, labelY);
+    labelYByTaxid.set(n.taxid, labelY);
+    if (labelY > maxLabelY) maxLabelY = labelY;
+  });
+  return { labelYByTaxid, canvasHeight: maxLabelY + bottomPadding };
+}
+
 // ---- SVG rendering (DOM only) -----------------------------------------
 
 const SANKEY_SVG_NS = 'http://www.w3.org/2000/svg';
 
 function renderSankeySVG(container, layout, { width, height, isHighlighted = null, tagFor = null, colorForCategory = null }) {
   container.innerHTML = '';
+
+  const { labelYByTaxid, canvasHeight } = computeSankeyLabelLayout(layout.nodes, height);
+
   const svg = document.createElementNS(SANKEY_SVG_NS, 'svg');
-  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  svg.setAttribute('viewBox', `0 0 ${width} ${canvasHeight}`);
   svg.setAttribute('width', '100%');
-  svg.setAttribute('height', height);
+  svg.setAttribute('height', canvasHeight);
 
   const linkGroup = document.createElementNS(SANKEY_SVG_NS, 'g');
   linkGroup.setAttribute('fill-opacity', '0.4');
@@ -244,15 +279,6 @@ function renderSankeySVG(container, layout, { width, height, isHighlighted = nul
   const nodeGroup = document.createElementNS(SANKEY_SVG_NS, 'g');
   const labelGroup = document.createElementNS(SANKEY_SVG_NS, 'g');
 
-  // Every node gets a label, including ones too short for the label to fit
-  // centred on the bar — otherwise raising "max taxa shown per rank" adds
-  // bars with no visible name. Labels are pushed down within their column
-  // (nodes are visited top-to-bottom already) to keep a minimum gap from
-  // the previous label, and a thin leader line ties an offset label back
-  // to its bar so it's still clear which name belongs to which segment.
-  const labelMinGap = 11;
-  const lastLabelYByRank = new Map();
-
   layout.nodes.forEach((n) => {
     const rect = document.createElementNS(SANKEY_SVG_NS, 'rect');
     rect.setAttribute('x', n.x);
@@ -270,11 +296,10 @@ function renderSankeySVG(container, layout, { width, height, isHighlighted = nul
     nodeGroup.appendChild(rect);
 
     const barCenterY = (n.y0 + n.y1) / 2;
-    const desiredLabelY = barCenterY + 3;
-    const lastY = lastLabelYByRank.get(n.rank);
-    const labelY = lastY !== undefined && desiredLabelY < lastY + labelMinGap ? lastY + labelMinGap : desiredLabelY;
-    lastLabelYByRank.set(n.rank, labelY);
+    const labelY = labelYByTaxid.get(n.taxid);
 
+    // A thin leader line ties an offset label back to its bar so it's
+    // still clear which name belongs to which segment.
     if (labelY - 3 !== barCenterY) {
       const leader = document.createElementNS(SANKEY_SVG_NS, 'line');
       leader.setAttribute('x1', n.x + layout.nodeWidth);
@@ -308,7 +333,7 @@ function colorForName(seed) {
   return `hsl(${hue}, 55%, 55%)`;
 }
 
-const sankeyExports = { computeSankeyData, computeSankeyLayout, renderSankeySVG, colorForName };
+const sankeyExports = { computeSankeyData, computeSankeyLayout, computeSankeyLabelLayout, renderSankeySVG, colorForName };
 if (typeof module !== 'undefined' && module.exports) module.exports = sankeyExports;
 if (typeof window !== 'undefined') {
   window.ClannEDNA = window.ClannEDNA || {};

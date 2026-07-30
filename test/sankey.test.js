@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { test, report, assert } = require('./harness');
-const { computeSankeyData, computeSankeyLayout } = require('../src/viz/sankey');
+const { computeSankeyData, computeSankeyLayout, computeSankeyLabelLayout } = require('../src/viz/sankey');
 const { TaxonomyTree } = require('../src/model/taxonomy-tree');
 const { parseBreport } = require('../src/parsers/breport');
 
@@ -98,6 +98,34 @@ test('layout: a column that leaves more reads out covers less of the canvas heig
   // every bar is sized against the same grandTotal rather than
   // renormalized to fill each column.
   assert.ok(coverage('S') < coverage('D'), 'species column should cover less height than domain, not be stretched to fill the column');
+});
+
+test('label layout: every node gets a label position, none of them missing', () => {
+  const tree = loadTree();
+  const data = computeSankeyData(tree, 'barcode39', ['D', 'P', 'C', 'O', 'F', 'G', 'S'], { maxNodesPerColumn: 30 });
+  const layout = computeSankeyLayout(data, { width: 900, height: 300 });
+  const { labelYByTaxid } = computeSankeyLabelLayout(layout.nodes, 300);
+  layout.nodes.forEach((n) => {
+    assert.ok(labelYByTaxid.has(n.taxid), `${n.name} should have a label position`);
+  });
+});
+
+test('label layout: the canvas grows to fit labels pushed past the nominal height, never clipping the last one', () => {
+  const tree = loadTree();
+  const data = computeSankeyData(tree, 'barcode39', ['D', 'P', 'C', 'O', 'F', 'G', 'S'], { maxNodesPerColumn: 30 });
+  const layout = computeSankeyLayout(data, { width: 900, height: 300 });
+  const { labelYByTaxid, canvasHeight } = computeSankeyLabelLayout(layout.nodes, 300);
+  const maxLabelY = Math.max(...labelYByTaxid.values());
+  assert.ok(canvasHeight > 300, 'a short nominal height with many small bars should force the canvas taller');
+  assert.ok(canvasHeight > maxLabelY, 'canvas must extend past the lowest label, not stop right at it');
+});
+
+test('label layout: canvas never shrinks below the nominal height when labels all fit', () => {
+  const tree = loadTree();
+  const data = computeSankeyData(tree, 'barcode39', ['D', 'P', 'C', 'O', 'F', 'G', 'S'], { maxNodesPerColumn: 3 });
+  const layout = computeSankeyLayout(data, { width: 900, height: 600 });
+  const { canvasHeight } = computeSankeyLabelLayout(layout.nodes, 600);
+  assert.ok(canvasHeight >= 600);
 });
 
 test('a custom maxNodesPerColumn is respected', () => {
