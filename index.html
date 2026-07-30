@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Clann eDNA Explorer</title>
+  <meta name="description" content="Browser-only explorer for Kraken2/Bracken eDNA metabarcoding classification results — part of the Clann suite." />
+  <link rel="stylesheet" href="styles/main.css" />
+</head>
+<body>
+  <header class="site-header">
+    <h1>Clann eDNA Explorer</h1>
+    <nav>
+      <a href="https://chriscreevey.github.io/clann-tree-viewer/">Tree Viewer</a>
+      <a href="https://chriscreevey.github.io/clann-blast-explorer/">BLAST Explorer</a>
+      <a href="https://chriscreevey.github.io/clann-pangenome-explorer/">Pangenome Explorer</a>
+      <button id="theme-toggle" type="button">Theme: Auto</button>
+    </nav>
+  </header>
+
+  <main class="layout">
+    <section class="panel load-panel">
+      <h2>Load a run</h2>
+      <p class="empty-state">
+        Point at a folder containing your Kraken2/Bracken output (<code>.bracken</code> / <code>.breport</code> files,
+        any names). Files are identified by content, not filename or extension.
+      </p>
+
+      <button id="pick-folder-btn" class="primary" type="button" style="display: none;">Choose folder&hellip;</button>
+      <input id="folder-input" type="file" webkitdirectory directory multiple style="display: none;" />
+
+      <ul id="file-ticklist" class="file-ticklist"></ul>
+      <p id="load-empty-state" class="empty-state">No files loaded yet.</p>
+    </section>
+
+    <section class="panel results-panel">
+      <h2>Results</h2>
+      <p class="empty-state">Load a run to see per-sample summaries, visualisations, and comparisons here.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span>Clann eDNA Explorer — part of the <a href="https://chriscreevey.github.io/">Clann suite</a>. GPL-2.0.</span>
+    <span><a href="https://github.com/chriscreevey/clann-edna-explorer">Source on GitHub</a></span>
+  </footer>
+
+  <script src="src/parsers/sniff.js"></script>
+  <script src="src/parsers/breport.js"></script>
+  <script src="src/parsers/bracken.js"></script>
+  <script src="src/parsers/generic.js"></script>
+  <script src="src/parsers/provenance.js"></script>
+  <script src="src/parsers/folder-loader.js"></script>
+  <script src="src/model/taxonomy-tree.js"></script>
+  <script src="src/app.js"></script>
+</body>
+</html>
