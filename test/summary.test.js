@@ -38,4 +38,27 @@ test('breport-only sample has no raw/re-estimated breakdown', () => {
   assert.strictEqual(summary.hasKrakenBreakdown, false);
 });
 
+test('an excluded species reduces classified/total reads by exactly its cladeReads', () => {
+  const tree = new TaxonomyTree();
+  parseBreport(read('barcode39.breport'), tree, 'barcode39');
+  const baseline = computeSampleSummary(tree, 'barcode39');
+  const filtered = computeSampleSummary(tree, 'barcode39', {
+    filters: { exclusionTerms: ['Coccinella transversoguttata'] },
+  });
+  assert.strictEqual(filtered.excludedReads, 33764);
+  assert.strictEqual(filtered.classifiedReads, baseline.classifiedReads - 33764);
+  assert.strictEqual(filtered.totalReads, baseline.totalReads - 33764);
+});
+
+test('the minimum-abundance threshold alone does not change summary reads (display-only filter)', () => {
+  const tree = new TaxonomyTree();
+  parseBreport(read('barcode39.breport'), tree, 'barcode39');
+  const baseline = computeSampleSummary(tree, 'barcode39');
+  const filtered = computeSampleSummary(tree, 'barcode39', {
+    filters: { minAbundance: { mode: 'pct', value: 50 } },
+  });
+  assert.strictEqual(filtered.excludedReads, 0);
+  assert.strictEqual(filtered.classifiedReads, baseline.classifiedReads);
+});
+
 report();

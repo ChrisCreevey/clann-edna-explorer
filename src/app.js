@@ -711,7 +711,7 @@
       return card;
     }
 
-    const summary = computeSampleSummary(run.tree, sample.id);
+    const summary = computeSampleSummary(run.tree, sample.id, { filters: currentFilters() });
     const stats = el('dl', { className: 'stat-grid' });
     const addStat = (label, value) => {
       stats.appendChild(el('dt', { text: label }));
@@ -720,6 +720,9 @@
     addStat('Total reads', summary.totalReads.toLocaleString());
     addStat('Classified', `${summary.classifiedReads.toLocaleString()} (${summary.classifiedPct.toFixed(2)}%)`);
     addStat('Unclassified', summary.unclassifiedReads.toLocaleString());
+    if (summary.excludedReads > 0) {
+      addStat('Excluded (filters)', summary.excludedReads.toLocaleString());
+    }
     if (summary.hasKrakenBreakdown) {
       addStat('Raw Kraken-assigned (species)', summary.rawAssignedReads.toLocaleString());
       addStat('Bracken-re-estimated (species)', summary.reEstimatedReads.toLocaleString());
@@ -967,7 +970,7 @@
   // ---- Sunburst (Krona-style) -----------------------------------------
 
   function renderSunburstSection(sample) {
-    const hierarchyRoot = buildHierarchyTree(run.tree, sample.id);
+    const hierarchyRoot = buildHierarchyTree(run.tree, sample.id, currentFilters());
     if (!hierarchyRoot) return null;
 
     const section = el('div', { className: 'card' });
@@ -1039,7 +1042,7 @@
         host.appendChild(el('p', { className: 'empty-state', text: 'Pick two different ranks to draw a flow diagram.' }));
         return;
       }
-      const data = computeSankeyData(run.tree, sample.id, rankRange);
+      const data = computeSankeyData(run.tree, sample.id, rankRange, { filters: currentFilters() });
       const width = Math.max(600, host.clientWidth || 700);
       const layout = computeSankeyLayout(data, { width, height: 420 });
       renderSankeySVG(host, layout, {
@@ -1155,7 +1158,7 @@
       const stats = bucket.ids
         .map((id) => run.samples.get(id))
         .filter((s) => s && s.kind !== 'generic')
-        .map((s) => computeSampleSummary(run.tree, s.id));
+        .map((s) => computeSampleSummary(run.tree, s.id, { filters: currentFilters() }));
       if (stats.length === 0) return;
       const totals = stats.map((s) => s.totalReads);
       const pcts = stats.map((s) => s.classifiedPct);
@@ -1389,7 +1392,7 @@
     const smallMultiples = el('div', { className: 'small-multiples' });
     section.appendChild(smallMultiples);
     included.forEach((sample) => {
-      const hierarchyRoot = buildHierarchyTree(run.tree, sample.id);
+      const hierarchyRoot = buildHierarchyTree(run.tree, sample.id, currentFilters());
       if (!hierarchyRoot) return;
       const cell = el('div', { className: 'small-multiple-cell' });
       cell.appendChild(el('p', { className: 'small-multiple-label', text: sampleGroupLabelFn(included)(sample.id) }));

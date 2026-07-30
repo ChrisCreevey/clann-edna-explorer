@@ -88,4 +88,43 @@ test('sample with no data returns null rather than throwing', () => {
   assert.strictEqual(root, null);
 });
 
+test('an excluded taxon and its whole subtree are dropped from the hierarchy', () => {
+  const tree = new TaxonomyTree();
+  parseBreport(read('barcode39.breport'), tree, 'barcode39');
+  const filters = { exclusionTerms: ['Coccinella transversoguttata'] };
+  const root = buildHierarchyTree(tree, 'barcode39', filters);
+
+  function find(node, taxid) {
+    if (node.taxid === taxid) return node;
+    for (const c of node.children) {
+      const found = find(c, taxid);
+      if (found) return found;
+    }
+    return null;
+  }
+  assert.strictEqual(find(root, 1790162), null);
+});
+
+test('a node below the minimum-abundance threshold is dropped along with its descendants', () => {
+  const tree = new TaxonomyTree();
+  parseBreport(read('barcode39.breport'), tree, 'barcode39');
+  const unfiltered = buildHierarchyTree(tree, 'barcode39');
+
+  function find(node, taxid) {
+    if (node.taxid === taxid) return node;
+    for (const c of node.children) {
+      const found = find(c, taxid);
+      if (found) return found;
+    }
+    return null;
+  }
+  const species = find(unfiltered, 1790162);
+  const thresholdAboveSpecies = species.pctOfTotal + 1;
+
+  const filtered = buildHierarchyTree(tree, 'barcode39', {
+    minAbundance: { mode: 'pct', value: thresholdAboveSpecies },
+  });
+  assert.strictEqual(find(filtered, 1790162), null);
+});
+
 report();

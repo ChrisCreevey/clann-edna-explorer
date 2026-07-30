@@ -93,4 +93,13 @@ test('layout: link geometry connects source right-edge to target left-edge', () 
   });
 });
 
+test('an excluded species is dropped from its rank column, same as the rank table', () => {
+  const tree = loadTree();
+  const data = computeSankeyData(tree, 'barcode39', ['D', 'P', 'C', 'O', 'F', 'G', 'S'], {
+    filters: { exclusionTerms: ['Coccinella transversoguttata'] },
+  });
+  const speciesCol = data.columns.find((c) => c.rank === 'S');
+  assert.ok(!speciesCol.nodes.some((n) => n.taxid === 1790162));
+});
+
 report();

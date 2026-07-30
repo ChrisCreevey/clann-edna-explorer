@@ -101,7 +101,63 @@
     return name.toLowerCase().includes(term) || String(taxid) === term;
   }
 
-  const filtersExports = { parseExclusionList, isRowExcluded, applyExclusionList, applyMinAbundance, applyFilters, matchesSearch };
+  /**
+   * Per-node prune mask for a whole sample tree (used by the sunburst and
+   * other hierarchy-based views, which can't run rows through
+   * applyFilters() one rank at a time the way computeRankTable does).
+   * A node is pruned if it — or any ancestor — matches an exclusion term,
+   * or if its own pctOfTotal/cladeReads falls below the abundance
+   * threshold. Thresholding an ancestor also prunes its descendants: their
+   * cladeReads/pctOfTotal can only be smaller, so they can't clear a bar
+   * their parent already missed. Requires that parents appear at a lower
+   * tree index than their children (true for report-derived trees, since
+   * getOrCreateNode resolves parentTaxid -> index before the child node is
+   * created), so a single forward pass is enough — no separate ancestor
+   * walk needed.
+   *
+   * @returns {Uint8Array} pruned[i] === 1 means don't show this node
+   */
+  function computeTreePruneMask(tree, sampleId, filters) {
+    const size = tree.size;
+    const pruned = new Uint8Array(size);
+    if (!filters) return pruned;
+    const exclusionTerms = (filters.exclusionTerms || []).map((t) => t.toLowerCase());
+    const mode = (filters.minAbundance && filters.minAbundance.mode) || 'pct';
+    const threshold = (filters.minAbundance && filters.minAbundance.value) || 0;
+    if (exclusionTerms.length === 0 && threshold <= 0) return pruned;
+
+    for (let i = 0; i < size; i++) {
+      const parentIdx = tree.parentIndex[i];
+      const ancestorPruned = parentIdx !== -1 && pruned[parentIdx] === 1;
+      let selfPruned = false;
+      if (!ancestorPruned) {
+        if (exclusionTerms.length > 0) {
+          const nameLower = tree.name[i].toLowerCase();
+          const taxidStr = String(tree.taxid[i]);
+          selfPruned = exclusionTerms.some((t) => t === nameLower || t === taxidStr);
+        }
+        if (!selfPruned && threshold > 0) {
+          const counts = tree.perSample[i].get(sampleId);
+          if (counts) {
+            const value = mode === 'reads' ? counts.cladeReads || 0 : counts.pctOfTotal || 0;
+            selfPruned = value < threshold;
+          }
+        }
+      }
+      pruned[i] = ancestorPruned || selfPruned ? 1 : 0;
+    }
+    return pruned;
+  }
+
+  const filtersExports = {
+    parseExclusionList,
+    isRowExcluded,
+    applyExclusionList,
+    applyMinAbundance,
+    applyFilters,
+    matchesSearch,
+    computeTreePruneMask,
+  };
   if (typeof module !== 'undefined' && module.exports) module.exports = filtersExports;
   if (typeof window !== 'undefined') {
     window.ClannEDNA = window.ClannEDNA || {};

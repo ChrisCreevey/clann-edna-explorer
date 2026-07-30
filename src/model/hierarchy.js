@@ -7,16 +7,27 @@
 // included; children are sorted by cladeReads descending so both
 // visualisations draw largest-first.
 
+const { computeTreePruneMask } = typeof module !== 'undefined' && module.exports
+  ? require('./filters')
+  : window.ClannEDNA.filters;
+
 /**
  * @param {import('./taxonomy-tree').TaxonomyTree} tree
  * @param {string} sampleId
+ * @param {{exclusionTerms?: string[], minAbundance?: {mode:'pct'|'reads', value:number}}} [filters]
+ *   Global filters (see src/model/filters.js) — a matched/below-threshold
+ *   node and its whole subtree are dropped, so this view stays consistent
+ *   with the rank table and comparison charts, which read through the same
+ *   filters.
  * @returns {object|null} nested root node, or null if the sample has no
  *   hierarchy (e.g. a bracken-only or generic sample)
  */
-function buildHierarchyTree(tree, sampleId) {
+function buildHierarchyTree(tree, sampleId, filters = null) {
   const byIndex = new Map(); // treeIndex -> hierarchy node
+  const pruned = computeTreePruneMask(tree, sampleId, filters);
 
   for (let i = 0; i < tree.size; i++) {
+    if (pruned[i]) continue;
     const counts = tree.perSample[i].get(sampleId);
     if (!counts) continue;
     byIndex.set(i, {
