@@ -71,7 +71,13 @@
 
     const groupStripHeight = colGroupColors ? 8 : 0;
     const headerHeight = 90; // rotated column labels
-    const width = labelWidth + colLabels.length * cellWidth + 4;
+    // The rightmost column's rotated label extends further right than the
+    // grid itself (rotate(-60) around the top of the last column), so pad
+    // the canvas width by the longest label's projected horizontal extent
+    // to keep it from being clipped at the top-right edge.
+    const longestColLabelLen = colLabels.reduce((max, l) => Math.max(max, l.length), 0);
+    const rightPad = Math.ceil(longestColLabelLen * 10 * Math.cos((60 * Math.PI) / 180)) + 8;
+    const width = labelWidth + colLabels.length * cellWidth + rightPad;
     const height = headerHeight + groupStripHeight + rowLabels.length * cellHeight + 4;
 
     const svg = document.createElementNS(HEATMAP_SVG_NS, 'svg');

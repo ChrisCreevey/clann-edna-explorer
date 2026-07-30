@@ -20,15 +20,40 @@
    */
   function renderStackedBarSVG(container, data, options = {}) {
     const width = options.width ?? Math.max(500, data.series.length * 70);
-    const height = options.height ?? 360;
     const barGap = 12;
     const barWidth = Math.min(60, (width - barGap * (data.series.length + 1)) / data.series.length);
     const chartTop = 10;
-    const chartHeight = height - 70;
+    const chartHeight = options.chartHeight ?? 280;
+    const sampleLabelHeight = 90; // rotated sample labels below the bars
     const labelFn = options.sampleLabels || ((id) => id);
     const isTaxonHighlighted = options.isTaxonHighlighted || null;
     const tagForTaxon = options.tagForTaxon || null;
     const colorForCategory = options.colorForCategory || null;
+
+    // Legend wraps into a grid beneath the sample labels instead of a
+    // single row that can run off the right edge.
+    const legendItems = [...data.taxonNames, 'Other'];
+    const legendRowHeight = 16;
+    const legendPadding = 8;
+    const legendRows = [];
+    {
+      let row = [];
+      let rowWidth = 0;
+      legendItems.forEach((name) => {
+        const itemWidth = Math.min(width - barGap * 2, name.length * 5.5 + 24);
+        if (rowWidth + itemWidth > width - barGap * 2 && row.length) {
+          legendRows.push(row);
+          row = [];
+          rowWidth = 0;
+        }
+        row.push({ name, itemWidth });
+        rowWidth += itemWidth;
+      });
+      if (row.length) legendRows.push(row);
+    }
+    const legendHeight = legendPadding + legendRows.length * legendRowHeight;
+
+    const height = options.height ?? (chartTop + chartHeight + sampleLabelHeight + legendHeight);
 
     container.innerHTML = '';
     const svg = document.createElementNS(STACKED_BAR_SVG_NS, 'svg');
@@ -65,38 +90,43 @@
         svg.appendChild(rect);
       });
 
+      const labelX = x + barWidth / 2;
+      const labelY = chartTop + chartHeight + 8;
       const label = document.createElementNS(STACKED_BAR_SVG_NS, 'text');
-      label.setAttribute('x', x + barWidth / 2);
-      label.setAttribute('y', chartTop + chartHeight + 14);
+      label.setAttribute('x', labelX);
+      label.setAttribute('y', labelY);
       label.setAttribute('font-size', '10');
       label.setAttribute('fill', 'var(--text)');
-      label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('text-anchor', 'end');
+      label.setAttribute('transform', `rotate(-60 ${labelX} ${labelY})`);
       label.textContent = labelFn(sample.sampleId);
       svg.appendChild(label);
     });
 
-    // Legend
-    const legendY = chartTop + chartHeight + 34;
-    let legendX = barGap;
-    const legendItems = [...data.taxonNames, 'Other'];
-    legendItems.forEach((name) => {
-      const swatch = document.createElementNS(STACKED_BAR_SVG_NS, 'rect');
-      swatch.setAttribute('x', legendX);
-      swatch.setAttribute('y', legendY);
-      swatch.setAttribute('width', 8);
-      swatch.setAttribute('height', 8);
-      swatch.setAttribute('fill', name === 'Other' ? 'hsl(0, 0%, 60%)' : colorForTaxonName(name));
-      svg.appendChild(swatch);
+    // Legend: wraps into a grid so it never runs off the right edge.
+    const legendStartY = chartTop + chartHeight + sampleLabelHeight;
+    legendRows.forEach((row, rowIndex) => {
+      let legendX = barGap;
+      const legendY = legendStartY + legendPadding + rowIndex * legendRowHeight;
+      row.forEach(({ name, itemWidth }) => {
+        const swatch = document.createElementNS(STACKED_BAR_SVG_NS, 'rect');
+        swatch.setAttribute('x', legendX);
+        swatch.setAttribute('y', legendY);
+        swatch.setAttribute('width', 8);
+        swatch.setAttribute('height', 8);
+        swatch.setAttribute('fill', name === 'Other' ? 'hsl(0, 0%, 60%)' : colorForTaxonName(name));
+        svg.appendChild(swatch);
 
-      const text = document.createElementNS(STACKED_BAR_SVG_NS, 'text');
-      text.setAttribute('x', legendX + 11);
-      text.setAttribute('y', legendY + 8);
-      text.setAttribute('font-size', '9');
-      text.setAttribute('fill', 'var(--text)');
-      text.textContent = name;
-      svg.appendChild(text);
+        const text = document.createElementNS(STACKED_BAR_SVG_NS, 'text');
+        text.setAttribute('x', legendX + 11);
+        text.setAttribute('y', legendY + 8);
+        text.setAttribute('font-size', '9');
+        text.setAttribute('fill', 'var(--text)');
+        text.textContent = name;
+        svg.appendChild(text);
 
-      legendX += name.length * 5.5 + 24;
+        legendX += itemWidth;
+      });
     });
 
     container.appendChild(svg);

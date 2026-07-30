@@ -1207,6 +1207,23 @@
     const max = Math.max(...allValues, 1e-9);
     const scale = (v) => (max > min ? ((v - min) / (max - min)) * 100 : 50);
 
+    const axisRow = el('div', { className: 'diversity-row diversity-axis-row' });
+    axisRow.appendChild(el('span', { className: 'diversity-group-label' }));
+    const axisTrack = el('div', { className: 'diversity-axis' });
+    const tickCount = 5;
+    for (let i = 0; i < tickCount; i++) {
+      const t = i / (tickCount - 1);
+      const value = min + t * (max - min);
+      const tick = el('div', { className: 'diversity-axis-tick' });
+      tick.style.left = `${t * 100}%`;
+      tick.appendChild(el('span', { className: 'diversity-axis-tick-mark' }));
+      tick.appendChild(el('span', { className: 'diversity-axis-tick-label', text: value.toFixed(2) }));
+      axisTrack.appendChild(tick);
+    }
+    axisRow.appendChild(axisTrack);
+    axisRow.appendChild(el('span', { className: 'diversity-value', text: metric }));
+    container.appendChild(axisRow);
+
     for (const [group, agg] of diversitySummary.groupAggregates) {
       const row = el('div', { className: 'diversity-row' });
       row.appendChild(el('span', { className: 'diversity-group-label', text: group }));
