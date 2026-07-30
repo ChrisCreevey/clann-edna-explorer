@@ -16,6 +16,7 @@
   const { buildHierarchyTree } = window.ClannEDNA.hierarchy;
   const { renderSunburstSVG } = window.ClannEDNA.sunburst;
   const { computeSankeyData, computeSankeyLayout, renderSankeySVG } = window.ClannEDNA.sankey;
+  const { EXCLUDE, parseGroupNames, resolveSampleGroup, summarizeGroups } = window.ClannEDNA.groups;
   const parsers = { parseBreport, parseBracken, parseGeneric, captureProvenance };
 
   const folderInput = document.getElementById('folder-input');
@@ -182,6 +183,7 @@
 
   const run = { tree: new TaxonomyTree(), samples: new Map() };
   let activeSampleId = null;
+  let groupNamesText = '';
 
   async function loadSelected() {
     const rows = Array.from(tickList.querySelectorAll('li'));
@@ -250,12 +252,104 @@
     return node;
   }
 
+  // ---- Sample groups (PLAN.md Phase 4) --------------------------------
+  //
+  // Group assignment is a display/analysis-layer setting only — it never
+  // touches run.tree or the parsed sample data, so retyping the group list
+  // or reassigning a sample re-renders instantly with no re-parse. Every
+  // later group-aware view (Phase 5+) should read assignments via
+  // summarizeGroups(run.samples, currentGroupNames()) rather than filtering
+  // samples itself, so it stays in sync with this panel automatically.
+
+  function currentGroupNames() {
+    return parseGroupNames(groupNamesText);
+  }
+
+  function sampleLabelWithGroup(sample) {
+    if (sample.group === EXCLUDE) return `${sample.id} (excluded)`;
+    if (sample.group) return `${sample.id} (${sample.group})`;
+    return sample.id;
+  }
+
+  function renderGroupsSection() {
+    if (run.samples.size < 2) return null; // brief: no grouping UI for a single sample
+
+    const section = el('div', { className: 'viz-section groups-section' });
+    section.appendChild(el('h3', { text: 'Sample groups' }));
+    section.appendChild(
+      el('p', {
+        className: 'viz-breadcrumb',
+        text: 'Type group names separated by commas, then assign each sample to one below. Excluded samples stay loaded but are left out of every calculation and view.',
+      })
+    );
+
+    const textInput = el('input', {
+      id: 'group-name-text-input',
+      type: 'text',
+      placeholder: 'e.g. Soil, Vegetation, Water',
+      value: groupNamesText,
+    });
+    textInput.addEventListener('input', () => {
+      groupNamesText = textInput.value;
+      const cursorPos = textInput.selectionStart;
+      const newGroupNames = currentGroupNames();
+      // Normalize every sample's stored assignment against the new list
+      // immediately, so a group that got retyped away doesn't leave a
+      // stale value sitting on the sample object for some later reader to
+      // forget to resolve (see resolveSampleGroup).
+      for (const sample of run.samples.values()) {
+        sample.group = resolveSampleGroup(sample.group, newGroupNames);
+      }
+      renderResults();
+      const restored = document.getElementById('group-name-text-input');
+      if (restored) {
+        restored.focus();
+        restored.setSelectionRange(cursorPos, cursorPos);
+      }
+    });
+    section.appendChild(el('div', { className: 'group-name-input-row' }, [textInput]));
+
+    const groupNames = currentGroupNames();
+    const list = el('ul', { className: 'sample-group-list scroll-panel' });
+    for (const sample of run.samples.values()) {
+      const li = el('li', { className: 'sample-group-row' });
+      li.appendChild(el('span', { className: 'sample-group-name', text: sample.id }));
+
+      const select = el('select');
+      select.appendChild(el('option', { value: '', text: '— unassigned —' }));
+      groupNames.forEach((g) => select.appendChild(el('option', { value: g, text: g })));
+      select.appendChild(el('option', { value: EXCLUDE, text: EXCLUDE }));
+      select.value = sample.group && (groupNames.includes(sample.group) || sample.group === EXCLUDE) ? sample.group : '';
+
+      select.addEventListener('change', () => {
+        sample.group = select.value || null;
+        renderResults();
+      });
+      li.appendChild(select);
+      list.appendChild(li);
+    }
+    section.appendChild(list);
+
+    const summary = summarizeGroups(run.samples, groupNames);
+    const summaryParts = [];
+    groupNames.forEach((g) => {
+      const count = summary.byGroup.get(g).length;
+      if (count > 0) summaryParts.push(`${g}: ${count}`);
+    });
+    if (summary.unassigned.length > 0) summaryParts.push(`unassigned: ${summary.unassigned.length}`);
+    if (summary.excluded.length > 0) summaryParts.push(`excluded: ${summary.excluded.length}`);
+    section.appendChild(el('p', { className: 'row-count', text: summaryParts.join(' · ') }));
+
+    return section;
+  }
+
   function renderSampleSelector() {
     const ids = [...run.samples.keys()];
     if (ids.length <= 1) return null;
     const select = el('select', { id: 'sample-selector' });
     ids.forEach((id) => {
-      const opt = el('option', { value: id, text: id });
+      const sample = run.samples.get(id);
+      const opt = el('option', { value: id, text: sampleLabelWithGroup(sample) });
       if (id === activeSampleId) opt.selected = true;
       select.appendChild(opt);
     });
@@ -531,6 +625,9 @@
     if (run.samples.size === 0) return;
     resultsPanel.innerHTML = '';
     resultsPanel.appendChild(el('h2', { text: 'Results' }));
+
+    const groupsSection = renderGroupsSection();
+    if (groupsSection) resultsPanel.appendChild(groupsSection);
 
     const selector = renderSampleSelector();
     if (selector) resultsPanel.appendChild(selector);

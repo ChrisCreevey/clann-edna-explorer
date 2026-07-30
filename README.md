@@ -19,9 +19,11 @@ plan and Phase 1 investigation findings.
 
 Phase 1 (investigation, data model, parsers, folder-based loading),
 Phase 2 (single-sample parsing, read-summary card, rank-by-rank table,
-Top-N bar chart, generic fallback with manual column mapping), and Phase 3
+Top-N bar chart, generic fallback with manual column mapping), Phase 3
 (Krona-style zoomable sunburst, Pavian-style Sankey diagram with a
-configurable rank cutoff) are built. Later phases (multi-sample comparison,
+configurable rank cutoff), and Phase 4 (comma-separated group text box,
+per-sample group dropdown with Exclude, live recalculation with no
+re-parse) are built. Later phases (multi-sample comparison views,
 diversity/similarity, exports) are not yet built — see `PLAN.md` §3.
 
 ## Running locally
@@ -53,7 +55,8 @@ src/parsers/           .bracken / .breport / generic parsers, content sniffer,
                         provenance capture, folder loader
 src/model/              shared taxid-keyed taxonomy tree, sample builder,
                         read-summary stats, rank-table/Top-N computation,
-                        nested-hierarchy builder for the visualisations
+                        nested-hierarchy builder for the visualisations,
+                        sample-group bookkeeping (groups.js)
 src/viz/                sunburst (Krona-style) and Sankey (Pavian-style)
                         layout math + SVG rendering
 src/app.js              UI wiring (folder loading, tick-list, sample loading,

@@ -32,6 +32,7 @@ function buildSample(sampleId, inputs, tree, parsers) {
     provenance: null,
     genericRows: null,
     sourceFiles: [],
+    group: null, // display-layer only — see src/model/groups.js; null = unassigned
   };
 
   if (inputs.breport) {

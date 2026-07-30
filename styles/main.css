@@ -472,3 +472,56 @@ table.rank-table td:nth-child(3) {
 .sankey-host {
   overflow-x: auto;
 }
+
+/* ---- Sample groups (Phase 4) ---- */
+
+.group-name-input-row {
+  margin-bottom: 0.6rem;
+}
+
+.group-name-input-row input {
+  width: 100%;
+  max-width: 28rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.9rem;
+}
+
+.sample-group-list {
+  list-style: none;
+  margin: 0 0 0.5rem 0;
+  padding: 0.25rem 0.5rem;
+  max-height: 12rem;
+}
+
+.sample-group-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
+.sample-group-row:last-child {
+  border-bottom: none;
+}
+
+.sample-group-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sample-group-row select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.85rem;
+}
