@@ -106,10 +106,8 @@ function colorForSunburstNode(node, ringDepth) {
  * the caller can update a breadcrumb / other linked views.
  */
 function renderSunburstSVG(container, root, options = {}) {
-  const size = options.size ?? 480;
+  const minSize = options.size ?? 480;
   const ringWidth = options.ringWidth ?? 32;
-  const cx = size / 2;
-  const cy = size / 2;
   const centerR = options.centerR ?? 28;
 
   let focus = options.initialFocus || root;
@@ -160,12 +158,13 @@ function renderSunburstSVG(container, root, options = {}) {
 
   // Mouse-wheel zoom: purely a visual magnifier (CSS scale on svgHost) —
   // it never changes `focus` or which segments are drawn. Clicking still
-  // does the actual drilling-down/up; the wheel just lets you zoom in on
-  // detail (e.g. to read crowded labels) without navigating anywhere.
-  // Applied to svgHost itself, which persists across draw() calls, so the
-  // zoom level survives a click-driven redraw instead of resetting.
+  // does the actual drilling-down/up; the wheel just lets you zoom in (or
+  // back out, below the natural 1:1 size) on detail without navigating
+  // anywhere. Applied to svgHost itself, which persists across draw()
+  // calls, so the zoom level survives a click-driven redraw instead of
+  // resetting.
   let zoomScale = 1;
-  const MIN_ZOOM = 1;
+  const MIN_ZOOM = 0.4;
   const MAX_ZOOM = 4;
   svgHost.style.transformOrigin = 'center center';
   container.addEventListener('wheel', (evt) => {
@@ -178,14 +177,26 @@ function renderSunburstSVG(container, root, options = {}) {
   function draw() {
     svgHost.innerHTML = '';
     hideTooltip();
-    const svg = document.createElementNS(SVG_NS, 'svg');
-    svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
-    svg.setAttribute('width', '100%');
-    svg.setAttribute('height', size);
 
     const segments = computeSunburstSegments(focus, { maxDepth: options.maxDepth ?? 8 });
     const outermostDepth = segments.reduce((max, s) => Math.max(max, s.depth), 0);
     const labelGroup = document.createElementNS(SVG_NS, 'g');
+
+    // The box has to fit whatever ring is actually deepest *this* draw —
+    // a fixed size sized for a shallow view clips the outer rings once
+    // you're zoomed in deep enough that more rings are on screen (e.g.
+    // maxDepth defaulting to 8 needs a bigger box than a 6-ring view
+    // does). +24 leaves room for the outermost ring's radial labels,
+    // which extend past outerR.
+    const neededRadius = centerR + outermostDepth * ringWidth + 24;
+    const size = Math.max(minSize, neededRadius * 2);
+    const cx = size / 2;
+    const cy = size / 2;
+
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', size);
 
     segments.forEach((seg) => {
       const innerR = centerR + (seg.depth - 1) * ringWidth;
