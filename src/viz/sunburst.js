@@ -156,27 +156,82 @@ function renderSunburstSVG(container, root, options = {}) {
     tooltip.style.display = 'none';
   }
 
-  // Mouse-wheel zoom: purely a visual magnifier (CSS scale on svgHost) —
-  // it never changes `focus` or which segments are drawn. Clicking still
-  // does the actual drilling-down/up; the wheel just lets you zoom in (or
-  // back out, below the natural 1:1 size) on detail without navigating
-  // anywhere. Applied to svgHost itself, which persists across draw()
-  // calls, so the zoom level survives a click-driven redraw instead of
-  // resetting.
+  // Mouse-wheel zoom + drag-to-pan: purely a visual magnifier (CSS
+  // transform on svgHost) — it never changes `focus` or which segments
+  // are drawn. Clicking still does the actual drilling-down/up; the wheel
+  // and drag just let you zoom in on detail and pan around it without
+  // navigating anywhere. Applied to svgHost itself, which persists across
+  // draw() calls, so the zoom level survives a click-driven redraw
+  // instead of resetting (pan is reset on redraw though — see draw()).
   let zoomScale = 1;
+  let panX = 0;
+  let panY = 0;
   const MIN_ZOOM = 0.4;
   const MAX_ZOOM = 4;
   svgHost.style.transformOrigin = 'center center';
+
+  function applyTransform() {
+    const parts = [];
+    if (panX !== 0 || panY !== 0) parts.push(`translate(${panX}px, ${panY}px)`);
+    if (zoomScale !== 1) parts.push(`scale(${zoomScale})`);
+    svgHost.style.transform = parts.join(' ');
+  }
+
   container.addEventListener('wheel', (evt) => {
     evt.preventDefault();
     const next = zoomScale + (evt.deltaY < 0 ? 0.15 : -0.15);
     zoomScale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next));
-    svgHost.style.transform = zoomScale === 1 ? '' : `scale(${zoomScale})`;
+    applyTransform();
+    if (!isPanning) container.style.cursor = zoomScale > 1 ? 'grab' : '';
   }, { passive: false });
+
+  // Dragging only pans once zoomed in — at 1:1 there's nothing to pan to,
+  // and leaving it disabled there means a plain click on a wedge (no
+  // drag) is never intercepted. A short drag-distance threshold
+  // distinguishes an actual drag from a click that happened to jitter by
+  // a pixel or two, and the capturing click listener below swallows the
+  // click that would otherwise fire at drag-release (mouseup naturally
+  // fires a click on whatever's under the cursor).
+  let isPanning = false;
+  let dragMoved = false;
+  let dragStart = null;
+  svgHost.addEventListener('mousedown', (evt) => {
+    if (zoomScale <= 1) return;
+    isPanning = true;
+    dragMoved = false;
+    dragStart = { x: evt.clientX, y: evt.clientY, panX, panY };
+    container.style.cursor = 'grabbing';
+    evt.preventDefault();
+  });
+  window.addEventListener('mousemove', (evt) => {
+    if (!isPanning) return;
+    const dx = evt.clientX - dragStart.x;
+    const dy = evt.clientY - dragStart.y;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragMoved = true;
+    panX = dragStart.panX + dx;
+    panY = dragStart.panY + dy;
+    applyTransform();
+  });
+  window.addEventListener('mouseup', () => {
+    if (!isPanning) return;
+    isPanning = false;
+    container.style.cursor = zoomScale > 1 ? 'grab' : '';
+  });
+  container.addEventListener('click', (evt) => {
+    if (dragMoved) {
+      evt.stopPropagation();
+      evt.preventDefault();
+      dragMoved = false;
+    }
+  }, true);
 
   function draw() {
     svgHost.innerHTML = '';
     hideTooltip();
+    panX = 0;
+    panY = 0;
+    applyTransform();
+    container.style.cursor = zoomScale > 1 ? 'grab' : '';
 
     const segments = computeSunburstSegments(focus, { maxDepth: options.maxDepth ?? 8 });
     const outermostDepth = segments.reduce((max, s) => Math.max(max, s.depth), 0);

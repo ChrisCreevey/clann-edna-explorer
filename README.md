@@ -1,185 +1,118 @@
 # Clann eDNA Explorer
 
-Browser-only tool for exploring taxonomic classification results from eDNA
-metabarcoding/metagenomic studies (Kraken2/Bracken, with a generic
-tab-delimited fallback for other classifiers). Part of the
-[Clann suite](https://chriscreevey.github.io/), alongside
+A free, browser-based tool for exploring taxonomic classification results
+from eDNA metabarcoding and metagenomic studies. Load your Kraken2/Bracken
+output and get per-sample summaries, a Krona-style zoomable sunburst, a
+Pavian-style Sankey diagram, and — once you've loaded more than one
+sample — group-aware multi-sample comparison: a stacked composition
+chart, an abundance heatmap, a presence/absence matrix, a diversity
+summary, and a Bray-Curtis/Jaccard sample-similarity matrix.
+
+Nothing is uploaded anywhere. Every parsing step, every chart, and every
+export runs entirely in your browser — your data never leaves your
+computer.
+
+**Use it online:** https://chriscreevey.github.io/clann-edna-explorer/
+
+It's one of the [Clann suite](https://chriscreevey.github.io/) of
+browser-based bioinformatics tools, alongside
 [Clann Tree Viewer](https://chriscreevey.github.io/clann-tree-viewer/),
 [Clann BLAST Explorer](https://chriscreevey.github.io/clann-blast-explorer/),
 and [Clann Pangenome Explorer](https://chriscreevey.github.io/clann-pangenome-explorer/).
 
-Vanilla HTML/CSS/JavaScript, no build step, no external dependencies.
-Hosted on GitHub Pages. GPL-2.0. UI shell (header/sidebar/footer, colour
-tokens, component styles) matches
-[Clann Pangenome Explorer](https://chriscreevey.github.io/clann-pangenome-explorer/)
-exactly: collapsible `<details class="sect">` sections in a left sidebar
-for Sample groups/Filters & search/Taxon category tags/Sample metadata, a
-centered "Choose folder…" empty state, and the same stone/clay/compute
-colour palette in both themes.
+## Features
 
-See [`clann-edna-explorer-brief.md`](clann-edna-explorer-brief.md) for the
-full design brief and [`PLAN.md`](PLAN.md) for the phased implementation
-plan and Phase 1 investigation findings.
+- **Per-sample view** — read-count summary (classified/unclassified, raw
+  Kraken-assigned vs. Bracken-re-estimated counts where available), a
+  sortable/searchable rank-by-rank abundance table, and a Top-N bar chart.
+- **Taxonomic sunburst** — a zoomable, Krona-style radial view of the full
+  taxonomy. Click a wedge to zoom in, click the centre to zoom out, and
+  scroll to magnify without changing what's shown.
+- **Sankey diagram** — read flow between taxonomic ranks, with a
+  configurable rank range.
+- **Multi-sample comparison** — assign samples to groups, then compare
+  across the whole run: a stacked composition chart, an abundance
+  heatmap, a presence/absence matrix, small-multiples sunbursts, a
+  diversity summary (richness, Shannon, Simpson), and a Bray-Curtis/
+  Jaccard sample-similarity matrix.
+- **Filtering and search** — a live minimum-abundance threshold and a
+  host/contaminant exclusion list, applied consistently everywhere; a
+  non-destructive search that highlights matches across every view
+  without hiding anything.
+- **Taxon tagging** — flag taxa of interest (pathogens, indicator
+  species, invasive species, …) by uploading a taxid/name list and/or
+  typing keyword rules; tags are highlighted consistently across every
+  table and diagram.
+- **Sample metadata** — join a CSV/TSV of per-sample metadata by ID, and
+  optionally pre-populate group assignments from one of its columns.
+- **Exports** — every diagram exports as SVG (vector) or PNG (raster);
+  the filtered table, the merged abundance matrix, and the diversity/
+  similarity summaries export as CSV; and the whole comparison exports
+  in [MicrobiomeAnalyst](https://www.microbiomeanalyst.ca/)'s documented
+  format for downstream statistical analysis.
 
-## Status
+## Input files
 
-Phase 1 (investigation, data model, parsers, folder-based loading),
-Phase 2 (single-sample parsing, read-summary card, rank-by-rank table,
-Top-N bar chart, generic fallback with manual column mapping), Phase 3
-(Krona-style zoomable sunburst, Pavian-style Sankey diagram with a
-configurable rank cutoff), Phase 4 (comma-separated group text box,
-per-sample group dropdown with Exclude, live recalculation with no
-re-parse), and Phase 5 (overview dashboard with per-group run stats and a
-diversity plot; multi-sample comparison — stacked composition bar chart,
-abundance heatmap, presence/absence matrix, small-multiples sunburst,
-diversity summary table, Bray-Curtis/Jaccard sample-similarity matrix, all
-group-aware), Phase 7 (global minimum-abundance filter and
-host/contaminant exclusion list — both applied centrally inside
-computeRankTable so every view that reads through it recalculates
-consistently; cross-view taxon search that highlights matches, rather than
-filtering, in the single-sample table, Top-N chart, stacked composition
-chart, abundance/presence heatmaps, sunburst, and Sankey), and — brought
-forward from Phase 9 — the MicrobiomeAnalyst structured export (abundance
-table, taxonomy mapping, metadata, all tab-delimited to spec) at the
-bottom of the Multi-sample comparison section, wired to the exact same
-included samples, rank, and filters currently on screen. Phase 8 (sample
-metadata CSV/TSV join, keyed by sample ID, with an optional "pre-populate
-groups from this column" that never overwrites a manual group choice;
-taxon category tagging via an uploaded taxid/name → category list and/or
-typed keyword rules, applied consistently across the rank table, Top-N
-chart, sunburst, Sankey, and comparison heatmaps/stacked bar) is also
-built. Phase 9 is now complete: every diagram (sunburst, Sankey, heatmaps,
-stacked bar) exports as a self-contained SVG or PNG (CSS custom properties
-resolved to concrete colours at export time, so the file looks right
-outside this page too); the filtered rank table, the full merged
-abundance matrix, and the diversity/similarity summaries export as CSV
-with the current group assignment included as a column; a per-taxon
-detail card (click any rank-table row) shows the full lineage and
-abundance across every loaded sample, with a cross-link to
-[Clann BLAST Explorer](https://chriscreevey.github.io/clann-blast-explorer/)
-to verify an unexpected call; and the site now has full meta tags
-(description, keywords, canonical, Open Graph, Twitter card,
-WebApplication + FAQPage JSON-LD), an About & FAQ section, and a footer
-matching the rest of the suite's convention (Feedback/GitHub/Star links).
-See `PLAN.md` §3 for the full phase breakdown.
+Point the file picker at the output files for a run — select every file
+at once (⇧-click, ⌘/Ctrl-click, or select-all). Files are identified by
+their **content**, not their filename or extension, so exports with
+generic names (e.g. from a Galaxy pipeline) still load correctly.
 
-The exclusion list and abundance threshold apply to every rank-table-
-derived view (single-sample table, Top-N chart, comparison heatmaps,
-stacked composition, diversity, similarity) but *not* to the sunburst or
-Sankey hierarchy views — removing a taxon from a hierarchy correctly would
-mean subtracting its reads from every ancestor's clade total recursively,
-which those two views don't do yet. This is a deliberate v1 scope
-boundary, not an oversight; search highlighting (non-destructive) does
-apply to the hierarchy views since it doesn't require recomputing sums.
+- **`.breport`** — a Kraken2/Bracken report: the full taxonomic
+  hierarchy, one row per taxon, with clade and direct read counts at
+  every rank.
+- **`.bracken`** — Bracken's leaf-rank re-estimated abundance table.
+  Loading both files for a sample merges them: the hierarchy comes from
+  the `.breport`, and species-level counts are reconciled against the
+  `.bracken` re-estimate.
+- A run can mix samples that only have one file type or the other —
+  each sample just needs at least one of the two.
 
-NMDS/PCA ordination remains explicitly out of v1 scope (per PLAN.md's
-open-points resolution) — sample similarity is a distance-matrix heatmap,
-not a dimensionality-reduced plot. Hierarchical clustering of the heatmap's
-row/column order is also not implemented; rows/columns are ordered by
-total abundance / group membership only.
+### Generic tab-delimited fallback
 
-## Running locally
+If a file isn't recognised as `.breport` or `.bracken`, it's tried as a
+generic tab-delimited table: at least two columns, one mostly numeric
+(read count or relative abundance) and one mostly text (taxon name),
+with an optional header row (detected automatically — a header is
+assumed if the first row's abundance cell isn't numeric). No taxonomic
+hierarchy is assumed, so a generic file only feeds the per-sample table
+and Top-N chart, not the sunburst or Sankey diagram.
 
-No build step. Serve the directory with any static file server and open
-`index.html`, e.g.:
+If the name/abundance columns can't be auto-detected confidently, you
+can set the column indices manually before loading. This fallback is
+meant for other classifiers' plain-table output (e.g. a Kaiju summary or
+a MetaPhlAn abundance table) — see below for planned native support.
+
+## Planned: native support for other classifiers
+
+Right now, anything other than Kraken2/Bracken goes through the generic
+tab-delimited fallback above. A future update will add native parsing
+(full taxonomic hierarchy, not just a flat table) for other common
+classifier outputs, likely including:
+
+- **Kaiju** (`kaiju2table` summary output)
+- **Centrifuge**
+- **MetaPhlAn**
+- **QIIME 2** (feature-table/taxonomy exports)
+
+If you use a classifier that isn't listed here and want it supported,
+[open an issue](https://github.com/chriscreevey/clann-edna-explorer/issues/new/choose).
+
+## Running it yourself
+
+No build step, no dependencies — it's plain HTML/CSS/JavaScript. Clone
+the repository and serve the directory with any static file server:
 
 ```bash
 python3 -m http.server 8000
 ```
 
-Then visit `http://localhost:8000/`.
+Then open `http://localhost:8000/`. Since it's a static site, you can
+also host it on any static host (GitHub Pages, Netlify, an internal
+web server, …), or just open `index.html` directly from disk in most
+browsers.
 
-## Running tests
+## License
 
-Zero-dependency Node test suite, driven directly off real example files in
-`test/fixtures/` (trimmed copies of `COI_bracken_outputs/`):
-
-```bash
-node test/run.js
-```
-
-## Project layout
-
-```
-index.html            entry point
-styles/main.css        theme-aware (light/dark) stylesheet
-src/parsers/           .bracken / .breport / generic parsers, content sniffer,
-                        provenance capture, folder loader, sample metadata
-                        CSV/TSV join (sample-metadata.js)
-src/model/              shared taxid-keyed taxonomy tree, sample builder,
-                        read-summary stats, rank-table/Top-N computation,
-                        nested-hierarchy builder for the visualisations,
-                        sample-group bookkeeping (groups.js), diversity
-                        indices (diversity.js), cross-sample abundance
-                        matrix + presence/absence + stacked composition
-                        (comparison.js), Bray-Curtis/Jaccard distance
-                        matrix (similarity.js), global abundance-threshold/
-                        exclusion-list filtering + search matching
-                        (filters.js), MicrobiomeAnalyst 3-file structured
-                        export (microbiome-analyst-export.js), taxon
-                        category tagging (tags.js), plain CSV exports
-                        (csv-export.js), per-taxon lineage/cross-sample
-                        detail (taxon-detail.js)
-src/viz/                sunburst (Krona-style), Sankey (Pavian-style),
-                        generic heatmap (heatmap.js — abundance,
-                        presence/absence, and similarity all reuse it),
-                        and stacked composition bar chart, all layout math
-                        + SVG rendering; shared SVG/PNG diagram export
-                        (svg-export.js) that bakes resolved CSS custom
-                        properties into the exported file so it's portable
-src/app.js              UI wiring: folder loading, tick-list, sample
-                        loading, sample groups, overview dashboard,
-                        multi-sample comparison, per-sample summary card,
-                        rank table, Top-N chart, sunburst, Sankey, theme
-                        toggle
-test/                    zero-dependency test harness + tests
-test/fixtures/           real example files used by the test suite
-examples/                trimmed example run for the hosted demo
-COI_bracken_outputs/     full original example run (7 barcodes) used during
-                         development; not shipped to the hosted app
-```
-
-## Data model notes (Phase 1 findings)
-
-`.breport`'s species-rank rows reconcile *exactly* with `.bracken`'s
-`new_est_reads` column (verified against the example run) — they are
-complementary views of the same Bracken re-estimated counts, not
-independent pre/post datasets. See `PLAN.md` §1 for the full investigation
-writeup, including the content-based format-detection rules and the
-(currently unconfirmed) status of Galaxy-exported header/provenance blocks.
-
-## Adding a new src/ file
-
-Every file under `src/` is a plain (non-module) `<script src>` include, not
-an ES module — there's no bundler. All of `src/`'s top-level declarations
-therefore share **one JS global scope** across the whole page. To avoid
-`let`/`const`/`function` name collisions between files (e.g. two files both
-declaring a top-level `SVG_NS` or destructuring the same import name), wrap
-every new file's body in an IIFE:
-
-```js
-(function () {
-  'use strict';
-
-  // ... file contents ...
-
-  const xExports = { ... };
-  if (typeof module !== 'undefined' && module.exports) module.exports = xExports;
-  if (typeof window !== 'undefined') {
-    window.ClannEDNA = window.ClannEDNA || {};
-    window.ClannEDNA.x = xExports;
-  }
-})();
-```
-
-Only the `window.ClannEDNA.<name>` export is visible to other files; expose
-functions through that object, not as bare globals. `src/app.js` already
-follows this pattern. (Every existing file was retrofitted with this
-wrapper after a real collision — see git history around the Phase 3 commit
-— so don't skip it for new files.)
-
-## Performance ceiling
-
-Not yet measured against a full multi-sample run — to be documented here
-once Phase 5+ (multi-sample comparison) is built and profiled, per the
-brief's requirement.
+Free and open source under [GPL-2.0](LICENSE), developed by
+[CreeveyLab](https://www.creeveylab.org/).
