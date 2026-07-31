@@ -65,12 +65,38 @@ function arcPath(cx, cy, innerR, outerR, angleStart, angleEnd) {
   ].join(' ');
 }
 
-function colorForSunburstSeed(seed) {
+function hashString(s) {
   let hash = 0;
-  const s = String(seed);
   for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
-  const hue = hash % 360;
+  return hash;
+}
+
+function colorForSunburstSeed(seed) {
+  const hue = hashString(String(seed)) % 360;
   return `hsl(${hue}, 55%, 55%)`;
+}
+
+/**
+ * Colour a node by its top-level ancestor (the node's nearest ancestor
+ * that is itself a direct child of the true root) rather than by the
+ * node's own taxid, so a whole radiating branch shares one hue family —
+ * lightening slightly ring by ring — instead of jumping to an unrelated
+ * hue at every rank the way a per-node hash does. That per-node hash was
+ * the biggest source of "this looks random" feedback on a taxonomy where
+ * most reads pass through a long single-child chain before branching:
+ * every pass-through ring recoloured for no reason. `ringDepth` is the
+ * ring's depth relative to the *current* zoom focus (see
+ * computeSunburstSegments), so the lightness gradient restarts cleanly
+ * each time you zoom in rather than needing the whole root-to-node depth.
+ */
+function colorForSunburstNode(node, ringDepth) {
+  let top = node;
+  while (top.parent && top.parent.parent) top = top.parent;
+  const baseHue = hashString(String(top.taxid)) % 360;
+  const hueJitter = (hashString(String(node.taxid)) % 24) - 12;
+  const hue = (baseHue + hueJitter + 360) % 360;
+  const lightness = Math.min(72, 42 + Math.max(0, ringDepth - 1) * 5);
+  return `hsl(${hue}, 55%, ${lightness}%)`;
 }
 
 /**
@@ -95,7 +121,8 @@ function renderSunburstSVG(container, root, options = {}) {
     svg.setAttribute('width', '100%');
     svg.setAttribute('height', size);
 
-    const segments = computeSunburstSegments(focus, { maxDepth: options.maxDepth ?? 6 });
+    const segments = computeSunburstSegments(focus, { maxDepth: options.maxDepth ?? 8 });
+    const labelGroup = document.createElementNS(SVG_NS, 'g');
 
     segments.forEach((seg) => {
       const innerR = centerR + (seg.depth - 1) * ringWidth;
@@ -104,7 +131,7 @@ function renderSunburstSVG(container, root, options = {}) {
       const category = options.tagFor && options.tagFor(seg.node.name, seg.node.taxid);
       const path = document.createElementNS(SVG_NS, 'path');
       path.setAttribute('d', arcPath(cx, cy, innerR, outerR, seg.angleStart, seg.angleEnd));
-      path.setAttribute('fill', colorForSunburstSeed(seg.node.taxid));
+      path.setAttribute('fill', colorForSunburstNode(seg.node, seg.depth));
       // Search highlight takes visual priority over a category tag when a
       // segment matches both — a category colour would otherwise mask the
       // active search, which is the more transient/deliberate action.
@@ -124,7 +151,38 @@ function renderSunburstSVG(container, root, options = {}) {
         });
       }
       svg.appendChild(path);
+
+      // On-wedge label — matches the reference Krona output (see
+      // hierarchy.js), which always names a ring rather than relying on a
+      // hover tooltip. Text runs radially outward from the ring's inner
+      // edge, so the space available for characters is the ring's radial
+      // thickness (outerR - innerR), not the arc length; the arc length
+      // instead has to clear the font size, since that's the wedge's
+      // width in the *tangential* direction the label's own height eats
+      // into — too little of that and neighbouring labels overlap each
+      // other rather than just each label overlapping the wrong wedge.
+      const midAngle = (seg.angleStart + seg.angleEnd) / 2;
+      const arcLength = (seg.angleEnd - seg.angleStart) * innerR;
+      const maxChars = Math.floor((outerR - innerR - 4) / 5.5);
+      if (arcLength > 10 && maxChars >= 3) {
+        const angleDeg = (midAngle * 180) / Math.PI;
+        const flipped = angleDeg > 90 && angleDeg < 270;
+        const [lx, ly] = [cx + (innerR + 3) * Math.sin(midAngle), cy - (innerR + 3) * Math.cos(midAngle)];
+        const rotateDeg = flipped ? angleDeg - 90 + 180 : angleDeg - 90;
+        const label = document.createElementNS(SVG_NS, 'text');
+        label.setAttribute('x', lx);
+        label.setAttribute('y', ly);
+        label.setAttribute('transform', `rotate(${rotateDeg} ${lx} ${ly})`);
+        label.setAttribute('text-anchor', flipped ? 'end' : 'start');
+        label.setAttribute('dominant-baseline', 'middle');
+        label.setAttribute('font-size', '9');
+        label.setAttribute('fill', '#111');
+        label.style.pointerEvents = 'none';
+        label.textContent = seg.node.name.length > maxChars ? `${seg.node.name.slice(0, maxChars - 1)}…` : seg.node.name;
+        labelGroup.appendChild(label);
+      }
     });
+    svg.appendChild(labelGroup);
 
     // Center circle: shows current focus name, click to zoom out.
     const center = document.createElementNS(SVG_NS, 'circle');
@@ -166,7 +224,7 @@ function renderSunburstSVG(container, root, options = {}) {
   };
 }
 
-const sunburstExports = { computeSunburstSegments, renderSunburstSVG, colorForSunburstSeed };
+const sunburstExports = { computeSunburstSegments, renderSunburstSVG, colorForSunburstSeed, colorForSunburstNode };
 if (typeof module !== 'undefined' && module.exports) module.exports = sunburstExports;
 if (typeof window !== 'undefined') {
   window.ClannEDNA = window.ClannEDNA || {};

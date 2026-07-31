@@ -72,6 +72,63 @@ test('known species node is reachable via parent pointers back to root', () => {
   assert.ok(hops > 0);
 });
 
+test('only canonical-rank nodes appear — no-rank filler clades (e.g. "cellular organisms", "Bilateria") are collapsed out', () => {
+  const tree = new TaxonomyTree();
+  parseBreport(read('barcode39.breport'), tree, 'barcode39');
+  const root = buildHierarchyTree(tree, 'barcode39');
+
+  function walk(node, visit) {
+    visit(node);
+    node.children.forEach((c) => walk(c, visit));
+  }
+  const canonicalRanks = new Set(['R', 'D', 'K', 'P', 'C', 'O', 'F', 'G', 'S']);
+  let sawFiller = false;
+  walk(root, (n) => {
+    if (!canonicalRanks.has(n.rank)) sawFiller = true;
+  });
+  assert.ok(!sawFiller, 'every hierarchy node should be a canonical rank, not a no-rank filler clade');
+
+  function find(node, name) {
+    if (node.name === name) return node;
+    for (const c of node.children) {
+      const found = find(c, name);
+      if (found) return found;
+    }
+    return null;
+  }
+  assert.strictEqual(find(root, 'cellular organisms'), null);
+  assert.strictEqual(find(root, 'Bilateria'), null);
+  assert.ok(find(root, 'Insecta'), 'canonical-rank ancestors should still be present');
+});
+
+test('depth is renumbered sequentially in the filtered hierarchy, not left as the raw (gap-filled) tree depth', () => {
+  const tree = new TaxonomyTree();
+  parseBreport(read('barcode39.breport'), tree, 'barcode39');
+  const root = buildHierarchyTree(tree, 'barcode39');
+
+  function walk(node, visit) {
+    visit(node);
+    node.children.forEach((c) => walk(c, visit));
+  }
+  walk(root, (n) => {
+    n.children.forEach((c) => {
+      assert.strictEqual(c.depth, n.depth + 1, `${c.name} should be exactly one deeper than its parent ${n.name}`);
+    });
+  });
+
+  function find(node, name) {
+    if (node.name === name) return node;
+    for (const c of node.children) {
+      const found = find(c, name);
+      if (found) return found;
+    }
+    return null;
+  }
+  // Insecta is 4 canonical ranks below root (D, K, P, C), whatever its raw
+  // tree.depth happens to be once no-rank clades are counted.
+  assert.strictEqual(find(root, 'Insecta').depth, root.depth + 4);
+});
+
 test('bracken-only sample (no ancestor chain) folds every leaf under one synthetic root', () => {
   const tree = new TaxonomyTree();
   parseBracken(read('barcode39.bracken'), tree, 'barcode39');

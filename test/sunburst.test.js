@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { test, report, assert } = require('./harness');
-const { computeSunburstSegments } = require('../src/viz/sunburst');
+const { computeSunburstSegments, colorForSunburstNode } = require('../src/viz/sunburst');
 const { buildHierarchyTree } = require('../src/model/hierarchy');
 const { TaxonomyTree } = require('../src/model/taxonomy-tree');
 const { parseBreport } = require('../src/parsers/breport');
@@ -47,6 +47,40 @@ test('slivers below minAnglePct are dropped', () => {
   const allSegments = computeSunburstSegments(root, { maxDepth: 6, minAnglePct: 0 });
   const filtered = computeSunburstSegments(root, { maxDepth: 6, minAnglePct: 0.05 });
   assert.ok(filtered.length < allSegments.length);
+});
+
+test('colorForSunburstNode: two nodes under the same top-level branch share a hue family', () => {
+  const root = loadRoot();
+  function find(node, name) {
+    if (node.name === name) return node;
+    for (const c of node.children) {
+      const found = find(c, name);
+      if (found) return found;
+    }
+    return null;
+  }
+  const insecta = find(root, 'Insecta');
+  const coleoptera = find(root, 'Coleoptera'); // Insecta -> ... -> Coleoptera, same branch
+  const hue = (color) => Number(/hsl\((\d+)/.exec(color)[1]);
+  const hueDiff = Math.abs(hue(colorForSunburstNode(insecta, 1)) - hue(colorForSunburstNode(coleoptera, 2)));
+  assert.ok(hueDiff <= 12, `expected siblings within the same branch to share a hue family, got a ${hueDiff} degree difference`);
+});
+
+test('colorForSunburstNode: deeper rings within a branch get lighter, not a different colour', () => {
+  const root = loadRoot();
+  function find(node, name) {
+    if (node.name === name) return node;
+    for (const c of node.children) {
+      const found = find(c, name);
+      if (found) return found;
+    }
+    return null;
+  }
+  const insecta = find(root, 'Insecta');
+  const lightness = (color) => Number(/,\s*(\d+)%\)$/.exec(color)[1]);
+  const shallow = lightness(colorForSunburstNode(insecta, 1));
+  const deep = lightness(colorForSunburstNode(insecta, 5));
+  assert.ok(deep > shallow, 'a deeper ring in the same branch should be lighter than a shallower one');
 });
 
 report();
