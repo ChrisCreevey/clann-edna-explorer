@@ -114,14 +114,45 @@ function renderSunburstSVG(container, root, options = {}) {
 
   let focus = options.initialFocus || root;
 
+  // The tooltip and its host div are created once and persist across
+  // zoom redraws (draw() below only ever clears svgHost) — recreating a
+  // DOM node on every hover would be wasteful and would also drop
+  // whatever mid-fade state a CSS transition was in.
+  container.innerHTML = '';
+  if (!container.style.position) container.style.position = 'relative';
+  const svgHost = document.createElement('div');
+  container.appendChild(svgHost);
+  const tooltip = document.createElement('div');
+  tooltip.className = 'sunburst-tooltip';
+  tooltip.style.cssText = [
+    'position:absolute', 'pointer-events:none', 'display:none', 'z-index:20',
+    'max-width:220px', 'padding:4px 8px', 'border-radius:4px',
+    'background:var(--panel)', 'border:1px solid var(--line)', 'color:var(--ink)',
+    'font-size:11px', 'line-height:1.4', 'box-shadow:var(--shadow-md)',
+  ].join(';');
+  container.appendChild(tooltip);
+
+  function showTooltip(evt, seg, category) {
+    tooltip.textContent = `${seg.node.name} (${seg.node.rank}) — ${seg.node.cladeReads.toLocaleString()} reads, ${seg.node.pctOfTotal.toFixed(2)}%${category ? ` [${category}]` : ''}`;
+    const rect = container.getBoundingClientRect();
+    tooltip.style.left = `${evt.clientX - rect.left + 12}px`;
+    tooltip.style.top = `${evt.clientY - rect.top + 12}px`;
+    tooltip.style.display = 'block';
+  }
+  function hideTooltip() {
+    tooltip.style.display = 'none';
+  }
+
   function draw() {
-    container.innerHTML = '';
+    svgHost.innerHTML = '';
+    hideTooltip();
     const svg = document.createElementNS(SVG_NS, 'svg');
     svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
     svg.setAttribute('width', '100%');
     svg.setAttribute('height', size);
 
     const segments = computeSunburstSegments(focus, { maxDepth: options.maxDepth ?? 8 });
+    const outermostDepth = segments.reduce((max, s) => Math.max(max, s.depth), 0);
     const labelGroup = document.createElementNS(SVG_NS, 'g');
 
     segments.forEach((seg) => {
@@ -139,9 +170,8 @@ function renderSunburstSVG(container, root, options = {}) {
       path.setAttribute('stroke-width', highlighted || category ? '2.5' : '0.5');
       path.style.cursor = seg.node.children.length > 0 ? 'pointer' : 'default';
 
-      const title = document.createElementNS(SVG_NS, 'title');
-      title.textContent = `${seg.node.name} (${seg.node.rank}) — ${seg.node.cladeReads.toLocaleString()} reads, ${seg.node.pctOfTotal.toFixed(2)}%${category ? ` [${category}]` : ''}`;
-      path.appendChild(title);
+      path.addEventListener('mousemove', (evt) => showTooltip(evt, seg, category));
+      path.addEventListener('mouseleave', hideTooltip);
 
       if (seg.node.children.length > 0) {
         path.addEventListener('click', () => {
@@ -154,31 +184,54 @@ function renderSunburstSVG(container, root, options = {}) {
 
       // On-wedge label — matches the reference Krona output (see
       // hierarchy.js), which always names a ring rather than relying on a
-      // hover tooltip. Text runs radially outward from the ring's inner
-      // edge, so the space available for characters is the ring's radial
-      // thickness (outerR - innerR), not the arc length; the arc length
-      // instead has to clear the font size, since that's the wedge's
-      // width in the *tangential* direction the label's own height eats
-      // into — too little of that and neighbouring labels overlap each
-      // other rather than just each label overlapping the wrong wedge.
+      // hover tooltip alone. Every ring except the outermost one currently
+      // drawn runs its label tangentially, following the curve of the
+      // ring (like Krona's inner rings) — that reads naturally against a
+      // wide arc and leaves the full ring width free for the text height.
+      // The outermost ring is usually made up of many thin wedges (finer
+      // ranks branch the most), where a curved label has no room to run
+      // along the arc at all, so it switches to radial — perpendicular to
+      // the circumference, running outward along the ring's own
+      // thickness instead, matching Krona's outer-ring labels.
       const midAngle = (seg.angleStart + seg.angleEnd) / 2;
+      const angleDeg = (midAngle * 180) / Math.PI;
       const arcLength = (seg.angleEnd - seg.angleStart) * innerR;
-      const maxChars = Math.floor((outerR - innerR - 4) / 5.5);
-      if (arcLength > 10 && maxChars >= 3) {
-        const angleDeg = (midAngle * 180) / Math.PI;
-        const flipped = angleDeg > 90 && angleDeg < 270;
-        const [lx, ly] = [cx + (innerR + 3) * Math.sin(midAngle), cy - (innerR + 3) * Math.cos(midAngle)];
-        const rotateDeg = flipped ? angleDeg - 90 + 180 : angleDeg - 90;
-        const label = document.createElementNS(SVG_NS, 'text');
-        label.setAttribute('x', lx);
-        label.setAttribute('y', ly);
-        label.setAttribute('transform', `rotate(${rotateDeg} ${lx} ${ly})`);
-        label.setAttribute('text-anchor', flipped ? 'end' : 'start');
+      const isOutermost = seg.depth === outermostDepth;
+
+      let label = null;
+      if (isOutermost) {
+        const maxChars = Math.floor((outerR - innerR - 4) / 5.5);
+        if (arcLength > 10 && maxChars >= 3) {
+          const flipped = angleDeg > 90 && angleDeg < 270;
+          const [lx, ly] = [cx + (innerR + 3) * Math.sin(midAngle), cy - (innerR + 3) * Math.cos(midAngle)];
+          const rotateDeg = flipped ? angleDeg - 90 + 180 : angleDeg - 90;
+          label = document.createElementNS(SVG_NS, 'text');
+          label.setAttribute('x', lx);
+          label.setAttribute('y', ly);
+          label.setAttribute('transform', `rotate(${rotateDeg} ${lx} ${ly})`);
+          label.setAttribute('text-anchor', flipped ? 'end' : 'start');
+          label.textContent = seg.node.name.length > maxChars ? `${seg.node.name.slice(0, maxChars - 1)}…` : seg.node.name;
+        }
+      } else {
+        const maxChars = Math.floor(arcLength / 5.5);
+        if (ringWidth >= 14 && maxChars >= 3) {
+          const midR = (innerR + outerR) / 2;
+          const flipped = angleDeg > 90 && angleDeg < 270;
+          const [lx, ly] = [cx + midR * Math.sin(midAngle), cy - midR * Math.cos(midAngle)];
+          const rotateDeg = flipped ? angleDeg - 180 : angleDeg;
+          label = document.createElementNS(SVG_NS, 'text');
+          label.setAttribute('x', lx);
+          label.setAttribute('y', ly);
+          label.setAttribute('transform', `rotate(${rotateDeg} ${lx} ${ly})`);
+          label.setAttribute('text-anchor', 'middle');
+          label.textContent = seg.node.name.length > maxChars ? `${seg.node.name.slice(0, maxChars - 1)}…` : seg.node.name;
+        }
+      }
+      if (label) {
         label.setAttribute('dominant-baseline', 'middle');
         label.setAttribute('font-size', '9');
         label.setAttribute('fill', '#111');
         label.style.pointerEvents = 'none';
-        label.textContent = seg.node.name.length > maxChars ? `${seg.node.name.slice(0, maxChars - 1)}…` : seg.node.name;
         labelGroup.appendChild(label);
       }
     });
@@ -189,8 +242,8 @@ function renderSunburstSVG(container, root, options = {}) {
     center.setAttribute('cx', cx);
     center.setAttribute('cy', cy);
     center.setAttribute('r', centerR);
-    center.setAttribute('fill', 'var(--bg-alt)');
-    center.setAttribute('stroke', 'var(--border)');
+    center.setAttribute('fill', 'var(--panel)');
+    center.setAttribute('stroke', 'var(--line)');
     if (focus.parent) {
       center.style.cursor = 'pointer';
       center.addEventListener('click', () => {
@@ -201,18 +254,18 @@ function renderSunburstSVG(container, root, options = {}) {
     }
     svg.appendChild(center);
 
-    const label = document.createElementNS(SVG_NS, 'text');
-    label.setAttribute('x', cx);
-    label.setAttribute('y', cy);
-    label.setAttribute('text-anchor', 'middle');
-    label.setAttribute('dominant-baseline', 'middle');
-    label.setAttribute('font-size', '10');
-    label.setAttribute('fill', 'var(--text)');
-    label.style.pointerEvents = 'none';
-    label.textContent = focus.depth <= 0 ? 'root' : focus.name;
-    svg.appendChild(label);
+    const centerLabel = document.createElementNS(SVG_NS, 'text');
+    centerLabel.setAttribute('x', cx);
+    centerLabel.setAttribute('y', cy);
+    centerLabel.setAttribute('text-anchor', 'middle');
+    centerLabel.setAttribute('dominant-baseline', 'middle');
+    centerLabel.setAttribute('font-size', '10');
+    centerLabel.setAttribute('fill', 'var(--ink)');
+    centerLabel.style.pointerEvents = 'none';
+    centerLabel.textContent = focus.depth <= 0 ? 'root' : focus.name;
+    svg.appendChild(centerLabel);
 
-    container.appendChild(svg);
+    svgHost.appendChild(svg);
   }
 
   draw();
