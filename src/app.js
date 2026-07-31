@@ -19,8 +19,10 @@
   const { computeDiversity, computeDiversitySummary } = window.ClannEDNA.diversity;
   const { buildAbundanceMatrix, toPresenceAbsence, computeStackedComposition } = window.ClannEDNA.comparison;
   const { computeDistanceMatrix } = window.ClannEDNA.similarity;
+  const { computePCoA } = window.ClannEDNA.ordination;
   const { renderHeatmapSVG, sequentialColor, binaryColor } = window.ClannEDNA.heatmap;
   const { renderStackedBarSVG } = window.ClannEDNA.stackedBar;
+  const { renderOrdinationSVG } = window.ClannEDNA.ordinationPlot;
   const { parseExclusionList, matchesSearch } = window.ClannEDNA.filters;
   const { buildMicrobiomeAnalystExport } = window.ClannEDNA.microbiomeAnalystExport;
   const { parseSampleMetadata, matchSummary: metadataMatchSummary } = window.ClannEDNA.sampleMetadata;
@@ -1284,9 +1286,147 @@
       const samplesWithGroup = included.map((s) => ({ id: s.id, group: s.group || 'Unassigned' }));
       const diversitySummary = computeDiversitySummary(run.tree, samplesWithGroup, comparisonRank, currentFilters());
       section.appendChild(renderDiversityPlot(diversitySummary, overviewMetric, groupNames));
+
+      const ordinationSection = renderOrdinationSection(included, groupNames);
+      if (ordinationSection) section.appendChild(ordinationSection);
     }
 
     return section;
+  }
+
+  // ---- Ordination (PCoA) ------------------------------------------------
+
+  let ordinationColorField = null; // null => colour by group; otherwise a metadata field name
+
+  function unionMetadataFieldNames(samples) {
+    const fields = new Set();
+    samples.forEach((s) => {
+      if (s.metadata) Object.keys(s.metadata).forEach((k) => fields.add(k));
+    });
+    return [...fields];
+  }
+
+  function isNumericMetadataField(samples, field) {
+    const values = samples
+      .map((s) => s.metadata && s.metadata[field])
+      .filter((v) => v !== undefined && v !== null && v !== '');
+    return values.length > 0 && values.every((v) => v !== '' && !Number.isNaN(Number(v)));
+  }
+
+  function colorForCategoricalValue(value) {
+    let hash = 0;
+    const str = String(value);
+    for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+    return `hsl(${hash % 360}, 55%, 50%)`;
+  }
+
+  function renderOrdinationSection(included, groupNames) {
+    const container = el('div', { className: 'ordination-section' });
+    container.appendChild(el('h4', { text: 'Ordination (PCoA on Bray-Curtis)' }));
+
+    if (included.length < 3) {
+      container.appendChild(el('p', { className: 'empty-state', text: 'Ordination needs at least 3 included samples.' }));
+      return container;
+    }
+
+    const sampleIds = included.map((s) => s.id);
+    const { sampleIds: distIds, matrix: distMatrix } = computeDistanceMatrix(
+      run.tree,
+      sampleIds,
+      comparisonRank,
+      'bray-curtis',
+      { filters: currentFilters() }
+    );
+    const pcoa = computePCoA(distMatrix, 2);
+    if (!pcoa) {
+      container.appendChild(el('p', { className: 'empty-state', text: 'Not enough samples to compute an ordination.' }));
+      return container;
+    }
+
+    const byId = new Map(included.map((s) => [s.id, s]));
+    const metadataFields = unionMetadataFieldNames(included);
+
+    const controlsRow = el('div', { className: 'overview-controls' });
+    controlsRow.appendChild(el('label', { text: 'Colour by: ' }));
+    const colorSelect = el('select');
+    const groupOpt = el('option', { value: '__group__', text: 'Group' });
+    groupOpt.selected = !ordinationColorField;
+    colorSelect.appendChild(groupOpt);
+    metadataFields.forEach((f) => {
+      const opt = el('option', { value: f, text: f });
+      opt.selected = ordinationColorField === f;
+      colorSelect.appendChild(opt);
+    });
+    colorSelect.addEventListener('change', () => {
+      ordinationColorField = colorSelect.value === '__group__' ? null : colorSelect.value;
+      renderResults();
+    });
+    controlsRow.appendChild(colorSelect);
+    container.appendChild(controlsRow);
+
+    let colorFn;
+    let colorLegend = null; // only shown when colour encodes something other than group (which the shape legend already shows)
+    if (!ordinationColorField) {
+      colorFn = (sampleId) => colorForGroup(byId.get(sampleId).group, groupNames);
+    } else {
+      const field = ordinationColorField;
+      if (isNumericMetadataField(included, field)) {
+        const values = distIds
+          .map((id) => Number(byId.get(id).metadata && byId.get(id).metadata[field]))
+          .filter((v) => !Number.isNaN(v));
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        const scaleColor = (v) => sequentialColor(v, min, max, { hue: 210 });
+        colorFn = (sampleId) => {
+          const raw = byId.get(sampleId).metadata && byId.get(sampleId).metadata[field];
+          const v = Number(raw);
+          return Number.isNaN(v) ? UNASSIGNED_COLOR : scaleColor(v);
+        };
+        colorLegend = { kind: 'numeric', min, max, label: field, colorFn: scaleColor };
+      } else {
+        const categories = [
+          ...new Set(
+            distIds
+              .map((id) => byId.get(id).metadata && byId.get(id).metadata[field])
+              .filter((v) => v !== undefined && v !== null && v !== '')
+          ),
+        ];
+        colorFn = (sampleId) => {
+          const v = byId.get(sampleId).metadata && byId.get(sampleId).metadata[field];
+          return v === undefined || v === null || v === '' ? UNASSIGNED_COLOR : colorForCategoricalValue(v);
+        };
+        colorLegend = { kind: 'categorical', items: categories.map((c) => ({ label: String(c), color: colorForCategoricalValue(c) })) };
+      }
+    }
+
+    const shapeLegend = groupNames.map((g, i) => ({ label: g, shapeIndex: i, color: colorForGroup(g, groupNames) }));
+    const unassignedShapeIndex = groupNames.length; // one shape beyond the last group's, so it never collides
+
+    const points = distIds.map((sampleId, i) => {
+      const sample = byId.get(sampleId);
+      const groupIdx = sample.group ? groupNames.indexOf(sample.group) : -1;
+      return {
+        sampleId,
+        x: pcoa.points[i][0] || 0,
+        y: pcoa.points[i][1] || 0,
+        shapeIndex: groupIdx >= 0 ? groupIdx : unassignedShapeIndex,
+        color: colorFn(sampleId),
+        tooltip: sample.group ? `${sampleId} (${sample.group})` : sampleId,
+      };
+    });
+
+    const ordinationHost = el('div', { className: 'ordination-host' });
+    container.appendChild(ordinationHost);
+    renderOrdinationSVG(ordinationHost, {
+      points,
+      xLabel: `PCo1 (${pcoa.varianceExplained[0].toFixed(1)}% var)`,
+      yLabel: `PCo2 (${(pcoa.varianceExplained[1] || 0).toFixed(1)}% var)`,
+      shapeLegend,
+      colorLegend,
+    });
+    container.appendChild(createExportButtons(() => ordinationHost, 'ordination-pcoa'));
+
+    return container;
   }
 
   function renderDiversityPlot(diversitySummary, metric, groupNames) {
