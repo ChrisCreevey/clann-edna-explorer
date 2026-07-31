@@ -16,7 +16,7 @@
   /**
    * @param {HTMLElement} container
    * @param {{taxonNames: string[], series: Array<{sampleId: string, values: Array<{name:string, pct:number}>, otherPct: number}>}} data
-   * @param {{width?: number, height?: number, sampleLabels?: Record<string,string>, isTaxonHighlighted?: (name:string) => boolean}} [options]
+   * @param {{width?: number, height?: number, sampleLabels?: Record<string,string>, isTaxonHighlighted?: (name:string) => boolean, onLegendClick?: (name:string) => void}} [options]
    */
   function renderStackedBarSVG(container, data, options = {}) {
     const width = options.width ?? Math.max(500, data.series.length * 70);
@@ -29,6 +29,7 @@
     const isTaxonHighlighted = options.isTaxonHighlighted || null;
     const tagForTaxon = options.tagForTaxon || null;
     const colorForCategory = options.colorForCategory || null;
+    const onLegendClick = options.onLegendClick || null;
 
     // Legend wraps into a grid beneath the sample labels instead of a
     // single row that can run off the right edge.
@@ -104,27 +105,51 @@
     });
 
     // Legend: wraps into a grid so it never runs off the right edge.
+    // Clicking an entry (not "Other" — it isn't a real taxon) highlights
+    // that taxon consistently across every comparison view, which matters
+    // most here: with many taxa, colours necessarily repeat, so the
+    // legend alone can't tell two same-hued segments apart.
     const legendStartY = chartTop + chartHeight + sampleLabelHeight;
     legendRows.forEach((row, rowIndex) => {
       let legendX = barGap;
       const legendY = legendStartY + legendPadding + rowIndex * legendRowHeight;
       row.forEach(({ name, itemWidth }) => {
+        const clickable = onLegendClick && name !== 'Other';
+        const highlighted = isTaxonHighlighted && isTaxonHighlighted(name);
+        const group = document.createElementNS(STACKED_BAR_SVG_NS, 'g');
+        if (clickable) {
+          group.style.cursor = 'pointer';
+          group.addEventListener('click', () => onLegendClick(name));
+        }
+
         const swatch = document.createElementNS(STACKED_BAR_SVG_NS, 'rect');
         swatch.setAttribute('x', legendX);
         swatch.setAttribute('y', legendY);
         swatch.setAttribute('width', 8);
         swatch.setAttribute('height', 8);
         swatch.setAttribute('fill', name === 'Other' ? 'hsl(0, 0%, 60%)' : colorForTaxonName(name));
-        svg.appendChild(swatch);
+        if (highlighted) {
+          swatch.setAttribute('stroke', 'var(--accent)');
+          swatch.setAttribute('stroke-width', '1.5');
+        }
+        group.appendChild(swatch);
 
         const text = document.createElementNS(STACKED_BAR_SVG_NS, 'text');
         text.setAttribute('x', legendX + 11);
         text.setAttribute('y', legendY + 8);
         text.setAttribute('font-size', '9');
-        text.setAttribute('fill', 'var(--text)');
+        text.setAttribute('fill', highlighted ? 'var(--accent)' : 'var(--text)');
+        if (highlighted) text.setAttribute('font-weight', 'bold');
         text.textContent = name;
-        svg.appendChild(text);
+        group.appendChild(text);
 
+        if (clickable) {
+          const title = document.createElementNS(STACKED_BAR_SVG_NS, 'title');
+          title.textContent = highlighted ? `Click to clear the ${name} highlight` : `Click to highlight ${name} everywhere in this comparison`;
+          group.appendChild(title);
+        }
+
+        svg.appendChild(group);
         legendX += itemWidth;
       });
     });

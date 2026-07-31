@@ -243,11 +243,25 @@
   let minAbundanceValue = 0;
   let globalSearchText = '';
 
+  // Set by clicking a taxon in the Multi-sample comparison section's
+  // stacked-bar legend — highlights that one taxon consistently across
+  // the comparison's stacked bar, abundance/presence heatmaps, and
+  // small-multiples sunburst. A separate state from globalSearchText
+  // (rather than writing into the search box) since there's no visible
+  // search field on this card to reflect it back into, and search vs. a
+  // one-off "which colour is this" click are different intents. Click the
+  // same entry again (or a different one) to swap/clear it.
+  let legendHighlightName = null;
+
   function currentFilters() {
     return {
       exclusionTerms: parseExclusionList(exclusionListText),
       minAbundance: { mode: minAbundanceMode, value: minAbundanceValue },
     };
+  }
+
+  function comparisonHighlightMatch(name, taxid) {
+    return matchesSearch(name, taxid, globalSearchText) || (legendHighlightName !== null && name === legendHighlightName);
   }
 
   // Sample metadata (PLAN.md Phase 8) — a joined CSV/TSV keyed by sample
@@ -1387,7 +1401,11 @@
     const stackedData = computeStackedComposition(run.tree, sampleIds, comparisonRank, stackedBarTopN, currentFilters());
     renderStackedBarSVG(stackedHost, stackedData, {
       sampleLabels: sampleGroupLabelFn(included),
-      isTaxonHighlighted: (name) => matchesSearch(name, null, globalSearchText),
+      isTaxonHighlighted: (name) => comparisonHighlightMatch(name, null),
+      onLegendClick: (name) => {
+        legendHighlightName = legendHighlightName === name ? null : name;
+        renderResults();
+      },
       // No taxid available on stacked-composition rows (see comparison.js
       // computeStackedComposition), so tagging here matches by name only —
       // fine for the uploaded name/taxid list's name half and for keyword
@@ -1420,7 +1438,7 @@
       colLabels: sampleIds.map(sampleGroupLabelFn(included)),
       matrix: cappedAbundance.matrix,
       colGroupColors,
-      isRowHighlighted: (name) => matchesSearch(name, null, globalSearchText),
+      isRowHighlighted: (name) => comparisonHighlightMatch(name, null),
       tagForRow,
       colorForCategory,
     });
@@ -1453,7 +1471,7 @@
       matrix: presenceAbsence.matrix,
       colorFn: binaryColor,
       colGroupColors,
-      isRowHighlighted: (name) => matchesSearch(name, null, globalSearchText),
+      isRowHighlighted: (name) => comparisonHighlightMatch(name, null),
       tagForRow,
       colorForCategory,
     });
@@ -1475,7 +1493,7 @@
         ringWidth: 12,
         centerR: 10,
         maxDepth: 5,
-        isHighlighted: (name, taxid) => matchesSearch(name, taxid, globalSearchText),
+        isHighlighted: (name, taxid) => comparisonHighlightMatch(name, taxid),
       });
       smallMultiples.appendChild(cell);
     });
