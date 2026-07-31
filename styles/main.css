@@ -35,6 +35,7 @@
 }
 
 *{box-sizing:border-box}
+html{overflow-x:hidden}
 html,body{height:100%;margin:0}
 body{font:13px/1.45 var(--font-sans);
      color:var(--ink);background:var(--bg);display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
