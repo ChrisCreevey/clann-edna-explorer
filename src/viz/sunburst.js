@@ -120,6 +120,11 @@ function renderSunburstSVG(container, root, options = {}) {
   // whatever mid-fade state a CSS transition was in.
   container.innerHTML = '';
   if (!container.style.position) container.style.position = 'relative';
+  // The wheel-zoom below scales svgHost with a CSS transform, which would
+  // otherwise spill out past container's box at any zoomScale > 1 — same
+  // class of "page wider than the window" bug the tooltip clamping above
+  // fixes, just from a different cause.
+  container.style.overflow = 'hidden';
   const svgHost = document.createElement('div');
   container.appendChild(svgHost);
   const tooltip = document.createElement('div');
@@ -134,14 +139,41 @@ function renderSunburstSVG(container, root, options = {}) {
 
   function showTooltip(evt, seg, category) {
     tooltip.textContent = `${seg.node.name} (${seg.node.rank}) — ${seg.node.cladeReads.toLocaleString()} reads, ${seg.node.pctOfTotal.toFixed(2)}%${category ? ` [${category}]` : ''}`;
-    const rect = container.getBoundingClientRect();
-    tooltip.style.left = `${evt.clientX - rect.left + 12}px`;
-    tooltip.style.top = `${evt.clientY - rect.top + 12}px`;
     tooltip.style.display = 'block';
+    const rect = container.getBoundingClientRect();
+    // Flip to the other side of the cursor when the default position would
+    // push the tooltip past the container's edge — an unclamped tooltip
+    // widens container's nearest scrolling ancestor (#wrap, the main
+    // content panel) enough to give it its own horizontal scrollbar,
+    // which reads as "the page got wider than the window" the moment you
+    // hover near the right or bottom edge of the chart.
+    let left = evt.clientX - rect.left + 12;
+    let top = evt.clientY - rect.top + 12;
+    if (left + tooltip.offsetWidth > rect.width) left = evt.clientX - rect.left - tooltip.offsetWidth - 12;
+    if (top + tooltip.offsetHeight > rect.height) top = evt.clientY - rect.top - tooltip.offsetHeight - 12;
+    tooltip.style.left = `${Math.max(0, left)}px`;
+    tooltip.style.top = `${Math.max(0, top)}px`;
   }
   function hideTooltip() {
     tooltip.style.display = 'none';
   }
+
+  // Mouse-wheel zoom: purely a visual magnifier (CSS scale on svgHost) —
+  // it never changes `focus` or which segments are drawn. Clicking still
+  // does the actual drilling-down/up; the wheel just lets you zoom in on
+  // detail (e.g. to read crowded labels) without navigating anywhere.
+  // Applied to svgHost itself, which persists across draw() calls, so the
+  // zoom level survives a click-driven redraw instead of resetting.
+  let zoomScale = 1;
+  const MIN_ZOOM = 1;
+  const MAX_ZOOM = 4;
+  svgHost.style.transformOrigin = 'center center';
+  container.addEventListener('wheel', (evt) => {
+    evt.preventDefault();
+    const next = zoomScale + (evt.deltaY < 0 ? 0.15 : -0.15);
+    zoomScale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next));
+    svgHost.style.transform = zoomScale === 1 ? '' : `scale(${zoomScale})`;
+  }, { passive: false });
 
   function draw() {
     svgHost.innerHTML = '';
@@ -242,7 +274,12 @@ function renderSunburstSVG(container, root, options = {}) {
     center.setAttribute('cx', cx);
     center.setAttribute('cy', cy);
     center.setAttribute('r', centerR);
-    center.setAttribute('fill', 'var(--panel)');
+    // Always white with dark text, regardless of theme — var(--panel) is
+    // near-black in dark mode, which combined with var(--ink) text (also
+    // dark-on-dark half the time, depending on which var actually resolved)
+    // made the centre label unreadable. The ring wedges already use fixed
+    // light-on-dark colours for their own labels for the same reason.
+    center.setAttribute('fill', '#fff');
     center.setAttribute('stroke', 'var(--line)');
     if (focus.parent) {
       center.style.cursor = 'pointer';
@@ -260,7 +297,7 @@ function renderSunburstSVG(container, root, options = {}) {
     centerLabel.setAttribute('text-anchor', 'middle');
     centerLabel.setAttribute('dominant-baseline', 'middle');
     centerLabel.setAttribute('font-size', '10');
-    centerLabel.setAttribute('fill', 'var(--ink)');
+    centerLabel.setAttribute('fill', '#111');
     centerLabel.style.pointerEvents = 'none';
     centerLabel.textContent = focus.depth <= 0 ? 'root' : focus.name;
     svg.appendChild(centerLabel);

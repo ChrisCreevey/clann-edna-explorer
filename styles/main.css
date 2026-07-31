@@ -113,6 +113,18 @@ code{background:var(--panel);border:1px solid var(--line);padding:0.05rem 0.3rem
 
 #explorer{padding:14px;display:flex;flex-direction:column;gap:14px;min-height:100%}
 
+/* Big divider between "cross-sample" and "single active sample" content —
+   deliberately not a .card (no border/shadow/background match) and much
+   larger than a .card h3, so the two groups of cards below read as
+   distinct sections rather than one flat run of same-sized cards. The
+   first one also gets no top margin so it doesn't add a gap before the
+   very top of #explorer. */
+.section-banner{margin:10px 0 -4px;padding:0 2px}
+.section-banner:first-child{margin-top:0}
+.section-banner-title{font-size:17px;font-weight:700;color:var(--ink);letter-spacing:.01em;
+  padding-bottom:6px;border-bottom:2px solid var(--accent)}
+.section-banner-subtitle{font-size:12px;color:var(--muted);margin-top:4px}
+
 .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;box-shadow:var(--shadow-sm)}
 .card h3{margin:0 0 8px;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
   font-family:var(--font-mono);font-weight:500}
@@ -187,6 +199,21 @@ main > *, #wrap, #explorer, .card, .bar-row, .diversity-row{min-width:0}
 .file-ticklist li[data-disabled='true']{color:var(--muted)}
 .file-ticklist .format-label{font-size:0.7rem;padding:0.05rem 0.4rem;border-radius:4px;background:var(--bg);border:1px solid var(--line)}
 .file-ticklist .reason{font-size:0.7rem;color:var(--muted)}
+/* Recognised files list first; anything that didn't sniff as a known
+   format is collapsed under here instead of interleaved with valid rows. */
+.invalid-files-wrapper{display:block;padding:0.35rem 0 0}
+.invalid-files-section summary{cursor:pointer;user-select:none;list-style:none;color:var(--muted);font-size:0.75rem;
+  padding:0.3rem 0}
+.invalid-files-section summary::-webkit-details-marker{display:none}
+.invalid-files-section summary::before{content:"▸";display:inline-block;margin-right:0.3rem;font-size:0.65rem;
+  transition:transform 120ms}
+.invalid-files-section[open] summary::before{transform:rotate(90deg)}
+.invalid-files-section summary:hover{color:var(--ink)}
+.invalid-files-list{list-style:none;margin:0;padding:0}
+.invalid-files-list li{display:flex;flex-wrap:wrap;align-items:baseline;gap:0.4rem;padding:0.35rem 0;
+  border-bottom:1px solid var(--line)}
+.invalid-files-list li[data-disabled='true']{color:var(--muted)}
+.invalid-files-list li:last-child{border-bottom:none}
 .sample-name-input{width:7rem;font-size:0.8rem}
 .filename{font-size:0.75rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .column-mapping{width:100%;font-size:0.75rem;color:var(--muted);display:flex;align-items:center;gap:0.5rem;padding-top:0.25rem}

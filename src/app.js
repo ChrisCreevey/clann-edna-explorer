@@ -82,6 +82,88 @@
 
   let currentResults = []; // [{file, format, confidence, reason?, candidateNameColumn?, candidateAbundanceColumn?}]
 
+  function buildTickListRow(result, index, usable) {
+    const li = document.createElement('li');
+    li.dataset.disabled = String(!usable);
+    li.dataset.index = String(index);
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = usable && result.confidence === 'high';
+    checkbox.disabled = !usable;
+    checkbox.className = 'row-checkbox';
+
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'sample-name-input';
+    nameInput.value = guessSampleIdFromFilename(result.file.name);
+    nameInput.title = 'Sample name — files sharing this name are merged into one sample';
+    nameInput.disabled = !usable;
+
+    const filename = document.createElement('span');
+    filename.textContent = result.file.name;
+    filename.style.flex = '1';
+    filename.className = 'filename';
+
+    const label = document.createElement('span');
+    label.className = 'format-label';
+    label.textContent = formatLabel(result);
+
+    li.appendChild(checkbox);
+    li.appendChild(nameInput);
+    li.appendChild(filename);
+    li.appendChild(label);
+
+    if (!usable || result.confidence === 'unconfirmed') {
+      const reason = document.createElement('span');
+      reason.className = 'reason';
+      reason.textContent = result.reason || '';
+      li.appendChild(reason);
+    }
+
+    if (result.format === 'generic' || (!usable && result.candidateNameColumn === undefined)) {
+      const mappingRow = document.createElement('div');
+      mappingRow.className = 'column-mapping';
+
+      const nameColLabel = document.createElement('label');
+      nameColLabel.textContent = 'name col ';
+      const nameColInput = document.createElement('input');
+      nameColInput.type = 'number';
+      nameColInput.min = '0';
+      nameColInput.className = 'name-col-input';
+      nameColInput.value = String(result.candidateNameColumn ?? 0);
+      nameColLabel.appendChild(nameColInput);
+
+      const abColLabel = document.createElement('label');
+      abColLabel.textContent = ' abundance col ';
+      const abColInput = document.createElement('input');
+      abColInput.type = 'number';
+      abColInput.min = '0';
+      abColInput.className = 'abundance-col-input';
+      abColInput.value = String(result.candidateAbundanceColumn ?? 1);
+      abColLabel.appendChild(abColInput);
+
+      mappingRow.appendChild(nameColLabel);
+      mappingRow.appendChild(abColLabel);
+
+      if (!usable) {
+        const forceBtn = document.createElement('button');
+        forceBtn.type = 'button';
+        forceBtn.textContent = 'Try as generic';
+        forceBtn.addEventListener('click', () => {
+          result.format = 'generic';
+          result.confidence = 'unconfirmed';
+          renderTickList(currentResults);
+        });
+        mappingRow.appendChild(forceBtn);
+      }
+
+      li.appendChild(mappingRow);
+    }
+
+    return li;
+  }
+
   function renderTickList(results) {
     currentResults = results;
     tickList.innerHTML = '';
@@ -89,88 +171,37 @@
     loadEmptyState.style.display = results.length === 0 ? '' : 'none';
     loadBtn.style.display = results.some((r) => r.format !== 'unknown') ? '' : 'none';
 
-    results.forEach((result, index) => {
-      const li = document.createElement('li');
-      const usable = result.format !== 'unknown';
-      li.dataset.disabled = String(!usable);
-      li.dataset.index = String(index);
+    // Recognised files first, so the files you actually want to load
+    // aren't buried among ones that didn't sniff as a known format —
+    // those go in a collapsed section below instead of interleaved.
+    const validIndices = [];
+    const invalidIndices = [];
+    results.forEach((r, i) => (r.format !== 'unknown' ? validIndices : invalidIndices).push(i));
 
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.checked = usable && result.confidence === 'high';
-      checkbox.disabled = !usable;
-      checkbox.className = 'row-checkbox';
-
-      const nameInput = document.createElement('input');
-      nameInput.type = 'text';
-      nameInput.className = 'sample-name-input';
-      nameInput.value = guessSampleIdFromFilename(result.file.name);
-      nameInput.title = 'Sample name — files sharing this name are merged into one sample';
-      nameInput.disabled = !usable;
-
-      const filename = document.createElement('span');
-      filename.textContent = result.file.name;
-      filename.style.flex = '1';
-      filename.className = 'filename';
-
-      const label = document.createElement('span');
-      label.className = 'format-label';
-      label.textContent = formatLabel(result);
-
-      li.appendChild(checkbox);
-      li.appendChild(nameInput);
-      li.appendChild(filename);
-      li.appendChild(label);
-
-      if (!usable || result.confidence === 'unconfirmed') {
-        const reason = document.createElement('span');
-        reason.className = 'reason';
-        reason.textContent = result.reason || '';
-        li.appendChild(reason);
-      }
-
-      if (result.format === 'generic' || (!usable && result.candidateNameColumn === undefined)) {
-        const mappingRow = document.createElement('div');
-        mappingRow.className = 'column-mapping';
-
-        const nameColLabel = document.createElement('label');
-        nameColLabel.textContent = 'name col ';
-        const nameColInput = document.createElement('input');
-        nameColInput.type = 'number';
-        nameColInput.min = '0';
-        nameColInput.className = 'name-col-input';
-        nameColInput.value = String(result.candidateNameColumn ?? 0);
-        nameColLabel.appendChild(nameColInput);
-
-        const abColLabel = document.createElement('label');
-        abColLabel.textContent = ' abundance col ';
-        const abColInput = document.createElement('input');
-        abColInput.type = 'number';
-        abColInput.min = '0';
-        abColInput.className = 'abundance-col-input';
-        abColInput.value = String(result.candidateAbundanceColumn ?? 1);
-        abColLabel.appendChild(abColInput);
-
-        mappingRow.appendChild(nameColLabel);
-        mappingRow.appendChild(abColLabel);
-
-        if (!usable) {
-          const forceBtn = document.createElement('button');
-          forceBtn.type = 'button';
-          forceBtn.textContent = 'Try as generic';
-          forceBtn.addEventListener('click', () => {
-            result.format = 'generic';
-            result.confidence = 'unconfirmed';
-            renderTickList(currentResults);
-          });
-          mappingRow.appendChild(forceBtn);
-        }
-
-        li.appendChild(mappingRow);
-      }
-
-      tickList.appendChild(li);
+    validIndices.forEach((i) => {
+      tickList.appendChild(buildTickListRow(results[i], i, true));
     });
+
+    if (invalidIndices.length > 0) {
+      const wrapperLi = document.createElement('li');
+      wrapperLi.className = 'invalid-files-wrapper';
+
+      const details = document.createElement('details');
+      details.className = 'invalid-files-section';
+      const summary = document.createElement('summary');
+      summary.textContent = `Other files not recognised (${invalidIndices.length})`;
+      details.appendChild(summary);
+
+      const invalidList = document.createElement('ul');
+      invalidList.className = 'invalid-files-list';
+      invalidIndices.forEach((i) => {
+        invalidList.appendChild(buildTickListRow(results[i], i, false));
+      });
+      details.appendChild(invalidList);
+
+      wrapperLi.appendChild(details);
+      tickList.appendChild(wrapperLi);
+    }
   }
 
   async function handleFiles(files) {
@@ -337,6 +368,18 @@
     });
     children.forEach((c) => node.appendChild(c));
     return node;
+  }
+
+  // A big, non-card divider distinguishing "cross-sample" content (the
+  // Overview dashboard + Multi-sample comparison) from "single active
+  // sample" content below it — both used to just be a flat run of equally
+  // small .card <h3> headers, so where one group ended and the other
+  // began wasn't obvious at a glance.
+  function renderSectionBanner(title, subtitle) {
+    const banner = el('div', { className: 'section-banner' });
+    banner.appendChild(el('div', { className: 'section-banner-title', text: title }));
+    if (subtitle) banner.appendChild(el('div', { className: 'section-banner-subtitle', text: subtitle }));
+    return banner;
   }
 
   function downloadTextFile(filename, text) {
@@ -1614,16 +1657,25 @@
     explorerEl.innerHTML = '';
 
     const overviewSection = renderOverviewDashboard();
-    if (overviewSection) explorerEl.appendChild(overviewSection);
-
     const comparisonSection = renderComparisonSection();
+    // Only worth a divider when there's cross-sample content to separate
+    // from the single-sample content below it — with one sample loaded,
+    // there's nothing to distinguish and the banner would just be noise.
+    const hasCrossSampleContent = Boolean(overviewSection || comparisonSection);
+    if (hasCrossSampleContent) {
+      explorerEl.appendChild(renderSectionBanner('Cross-sample overview', `${run.samples.size} samples loaded`));
+    }
+    if (overviewSection) explorerEl.appendChild(overviewSection);
     if (comparisonSection) explorerEl.appendChild(comparisonSection);
 
     const selector = renderSampleSelector();
-    if (selector) explorerEl.appendChild(selector);
 
     const sample = run.samples.get(activeSampleId);
     hMeta.textContent = `active: ${sample.id}`;
+    if (hasCrossSampleContent) {
+      explorerEl.appendChild(renderSectionBanner('Individual sample', sampleLabelWithGroup(sample)));
+    }
+    if (selector) explorerEl.appendChild(selector);
     explorerEl.appendChild(renderSummaryCard(sample));
 
     if (sample.kind !== 'generic') {
