@@ -71,13 +71,28 @@ test('stacked composition: every sample\'s segments + Other sum to ~100%', () =>
   });
 });
 
-test('stacked composition uses the same top taxa (by combined total) for every sample\'s bar', () => {
+test('stacked composition: every sample\'s bar stacks against the same (unioned) taxon list, in the same order', () => {
   const tree = loadTree();
   const { taxonNames, series } = computeStackedComposition(tree, ['barcode39', 'barcode40'], 'S', 5);
-  assert.strictEqual(taxonNames.length, 5);
+  // The union of each sample's own top 5 can be more than 5 taxa if the
+  // two samples don't fully overlap, but never more than 5 per sample.
+  assert.ok(taxonNames.length >= 5 && taxonNames.length <= 10);
   series.forEach((s) => {
     assert.deepStrictEqual(s.values.map((v) => v.name), taxonNames);
   });
+});
+
+test('stacked composition: a taxon that dominates one sample gets its own top-N slot even if minor overall', () => {
+  const tree = loadTree();
+  const m = buildAbundanceMatrix(tree, ['barcode39', 'barcode40'], 'S');
+  // Pick barcode40's single largest taxon and confirm it's included in the
+  // union even with maxTaxa=1 (i.e. genuinely per-sample top-1, not top-1
+  // by combined total across both samples).
+  const barcode40Top = m.taxa
+    .map((t, i) => ({ name: t.name, value: m.matrix[i][1] }))
+    .sort((a, b) => b.value - a.value)[0];
+  const { taxonNames } = computeStackedComposition(tree, ['barcode39', 'barcode40'], 'S', 1);
+  assert.ok(taxonNames.includes(barcode40Top.name), `expected ${barcode40Top.name} (barcode40's own top taxon) in the union`);
 });
 
 test('buildAbundanceMatrix respects an exclusion filter across every sample column', () => {

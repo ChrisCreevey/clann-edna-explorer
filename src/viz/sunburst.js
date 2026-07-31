@@ -282,48 +282,27 @@ function renderSunburstSVG(container, root, options = {}) {
 
       // On-wedge label — matches the reference Krona output (see
       // hierarchy.js), which always names a ring rather than relying on a
-      // hover tooltip alone. Every ring except the outermost one currently
-      // drawn runs its label tangentially, following the curve of the
-      // ring (like Krona's inner rings) — that reads naturally against a
-      // wide arc and leaves the full ring width free for the text height.
-      // The outermost ring is usually made up of many thin wedges (finer
-      // ranks branch the most), where a curved label has no room to run
-      // along the arc at all, so it switches to radial — perpendicular to
-      // the circumference, running outward along the ring's own
-      // thickness instead, matching Krona's outer-ring labels.
+      // hover tooltip alone. Every ring, including the outermost, runs
+      // its label tangentially, following the curve of the ring, for a
+      // consistent look across the whole chart rather than the outermost
+      // ring alone reading in a different (radial) direction.
       const midAngle = (seg.angleStart + seg.angleEnd) / 2;
       const angleDeg = (midAngle * 180) / Math.PI;
       const arcLength = (seg.angleEnd - seg.angleStart) * innerR;
-      const isOutermost = seg.depth === outermostDepth;
 
       let label = null;
-      if (isOutermost) {
-        const maxChars = Math.floor((outerR - innerR - 4) / 5.5);
-        if (arcLength > 10 && maxChars >= 3) {
-          const flipped = angleDeg > 90 && angleDeg < 270;
-          const [lx, ly] = [cx + (innerR + 3) * Math.sin(midAngle), cy - (innerR + 3) * Math.cos(midAngle)];
-          const rotateDeg = flipped ? angleDeg - 90 + 180 : angleDeg - 90;
-          label = document.createElementNS(SVG_NS, 'text');
-          label.setAttribute('x', lx);
-          label.setAttribute('y', ly);
-          label.setAttribute('transform', `rotate(${rotateDeg} ${lx} ${ly})`);
-          label.setAttribute('text-anchor', flipped ? 'end' : 'start');
-          label.textContent = seg.node.name.length > maxChars ? `${seg.node.name.slice(0, maxChars - 1)}…` : seg.node.name;
-        }
-      } else {
-        const maxChars = Math.floor(arcLength / 5.5);
-        if (ringWidth >= 14 && maxChars >= 3) {
-          const midR = (innerR + outerR) / 2;
-          const flipped = angleDeg > 90 && angleDeg < 270;
-          const [lx, ly] = [cx + midR * Math.sin(midAngle), cy - midR * Math.cos(midAngle)];
-          const rotateDeg = flipped ? angleDeg - 180 : angleDeg;
-          label = document.createElementNS(SVG_NS, 'text');
-          label.setAttribute('x', lx);
-          label.setAttribute('y', ly);
-          label.setAttribute('transform', `rotate(${rotateDeg} ${lx} ${ly})`);
-          label.setAttribute('text-anchor', 'middle');
-          label.textContent = seg.node.name.length > maxChars ? `${seg.node.name.slice(0, maxChars - 1)}…` : seg.node.name;
-        }
+      const maxChars = Math.floor(arcLength / 5.5);
+      if (ringWidth >= 14 && maxChars >= 3) {
+        const midR = (innerR + outerR) / 2;
+        const flipped = angleDeg > 90 && angleDeg < 270;
+        const [lx, ly] = [cx + midR * Math.sin(midAngle), cy - midR * Math.cos(midAngle)];
+        const rotateDeg = flipped ? angleDeg - 180 : angleDeg;
+        label = document.createElementNS(SVG_NS, 'text');
+        label.setAttribute('x', lx);
+        label.setAttribute('y', ly);
+        label.setAttribute('transform', `rotate(${rotateDeg} ${lx} ${ly})`);
+        label.setAttribute('text-anchor', 'middle');
+        label.textContent = seg.node.name.length > maxChars ? `${seg.node.name.slice(0, maxChars - 1)}…` : seg.node.name;
       }
       if (label) {
         label.setAttribute('dominant-baseline', 'middle');

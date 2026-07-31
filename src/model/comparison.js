@@ -72,26 +72,46 @@
   }
 
   /**
-   * Per-sample composition series for a stacked bar chart: the top N taxa
-   * *by total abundance across all included samples* (so every bar uses
-   * the same taxon-to-colour mapping), plus a per-sample "Other" bucket
-   * for the remainder — mirrors the single-sample Top-N chart's approach
-   * (src/model/rank-table.js computeTopN), applied across samples instead
-   * of within one.
+   * Per-sample composition series for a stacked bar chart: each sample
+   * contributes *its own* top N taxa (by that sample's cladeReads) — not
+   * the top N by combined total across samples — since a taxon that
+   * dominates one sample but is minor everywhere else would otherwise be
+   * folded into "Other" for the very sample it matters most in. The union
+   * of every sample's top N becomes the shared taxon list every bar
+   * stacks against (so a taxon another sample surfaced still gets its own
+   * slice here, however small, rather than being folded into this
+   * sample's "Other"); a per-sample "Other" bucket covers the remainder.
+   * Mirrors the single-sample Top-N chart's approach (src/model/
+   * rank-table.js computeTopN), applied per sample instead of globally.
    *
    * @returns {{taxonNames: string[], series: Array<{sampleId: string, values: Array<{name: string, pct: number}>, otherPct: number}>}}
    */
   function computeStackedComposition(tree, sampleIds, rank, maxTaxa = 10, filters = null) {
     const { taxa, matrix, sampleIds: cols } = buildAbundanceMatrix(tree, sampleIds, rank, { valueField: 'cladeReads', filters });
-    const topTaxa = taxa.slice(0, maxTaxa);
-    const topIndices = topTaxa.map((_, i) => i);
+
+    // Each sample's own top N row-indices, by that column's value.
+    const unionIndices = new Set();
+    cols.forEach((_, colIdx) => {
+      matrix
+        .map((row, rowIdx) => ({ rowIdx, value: row[colIdx] }))
+        .filter((r) => r.value > 0)
+        .sort((a, b) => b.value - a.value)
+        .slice(0, maxTaxa)
+        .forEach((r) => unionIndices.add(r.rowIdx));
+    });
+
+    // `taxa`/`matrix` are already ordered by combined total descending
+    // (see buildAbundanceMatrix) — keep that relative order for the
+    // union subset so the legend/stack order stays stable and legible.
+    const topIndices = taxa.map((_, i) => i).filter((i) => unionIndices.has(i));
+    const topTaxa = topIndices.map((i) => taxa[i]);
 
     const columnTotals = cols.map((_, colIdx) => matrix.reduce((s, row) => s + row[colIdx], 0));
 
     const series = cols.map((sampleId, colIdx) => {
       const total = columnTotals[colIdx] || 1;
       const values = topIndices.map((rowIdx) => ({
-        name: topTaxa[rowIdx].name,
+        name: taxa[rowIdx].name,
         pct: (100 * matrix[rowIdx][colIdx]) / total,
       }));
       const topSum = values.reduce((s, v) => s + v.pct, 0);
