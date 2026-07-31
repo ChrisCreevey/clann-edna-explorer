@@ -2,8 +2,7 @@
   'use strict';
 
   const { sniffFormat } = window.ClannEDNA.sniff;
-  const { filesFromWebkitDirectoryInput, supportsFileSystemAccess, pickFolderFileSystemAccess } =
-    window.ClannEDNA.folderLoader;
+  const { filesFromFileInput } = window.ClannEDNA.folderLoader;
   const { buildSample, guessSampleIdFromFilename } = window.ClannEDNA.sample;
   const { computeSampleSummary } = window.ClannEDNA.summary;
   const { RANK_ORDER, computeAvailableRanks, computeRankTable, computeGenericTable, sortRows, computeTopN } =
@@ -209,31 +208,22 @@
     renderTickList(results);
   }
 
-  // A single "Choose folder…" affordance appears in two places (the header,
+  // A single "Choose files…" affordance appears in two places (the header,
   // always visible, and centered in the empty-state hero before anything is
-  // loaded) — both trigger the same picking logic.
-  async function chooseFolder() {
-    if (supportsFileSystemAccess()) {
-      try {
-        const files = await pickFolderFileSystemAccess();
-        await handleFiles(files);
-      } catch (err) {
-        if (err.name !== 'AbortError') console.error(err);
-      }
-    } else {
-      folderInput.click();
-    }
+  // loaded) — both just open the plain multi-file picker below, which
+  // behaves identically across every browser (no directory-picker feature
+  // detection/fallback to keep in sync — see folder-loader.js).
+  function chooseFiles() {
+    folderInput.click();
   }
 
-  if (!supportsFileSystemAccess()) {
-    folderInput.addEventListener('change', async (event) => {
-      const files = filesFromWebkitDirectoryInput(event.target.files);
-      await handleFiles(files);
-    });
-  }
+  folderInput.addEventListener('change', async (event) => {
+    const files = filesFromFileInput(event.target.files);
+    await handleFiles(files);
+  });
 
-  uploadBtn.addEventListener('click', chooseFolder);
-  emptyOpenBtn.addEventListener('click', chooseFolder);
+  uploadBtn.addEventListener('click', chooseFiles);
+  emptyOpenBtn.addEventListener('click', chooseFiles);
 
   // ---- Loading selected files into samples --------------------------
 
@@ -331,14 +321,14 @@
     activeSampleId = activeSampleId && run.samples.has(activeSampleId) ? activeSampleId : grouped.keys().next().value;
 
     // Once a run is loaded, the tick-list has done its job — leaving it
-    // sitting there under "Choose folder…" is just clutter, so collapse
-    // it down to a one-line summary. "Choose folder…" (header or hero)
+    // sitting there under "Choose files…" is just clutter, so collapse
+    // it down to a one-line summary. "Choose files…" (header or hero)
     // still starts a fresh pick at any time.
     tickList.innerHTML = '';
     tickList.style.display = 'none';
     loadBtn.style.display = 'none';
     loadEmptyState.style.display = '';
-    loadEmptyState.textContent = `${run.samples.size} sample${run.samples.size === 1 ? '' : 's'} loaded. Choose a folder above to load more.`;
+    loadEmptyState.textContent = `${run.samples.size} sample${run.samples.size === 1 ? '' : 's'} loaded. Choose files above to load more.`;
 
     renderResults();
   }

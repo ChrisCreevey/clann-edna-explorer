@@ -61,8 +61,8 @@
     <span class="title" id="hTitle"></span>
     <span class="meta" id="hMeta"></span>
     <span class="spacer"></span>
-    <button id="uploadBtn" type="button" title="Point at a folder of Kraken2/Bracken output">Choose folder&hellip;</button>
-    <input id="folder-input" type="file" webkitdirectory directory multiple style="display: none;" />
+    <button id="uploadBtn" type="button" title="Pick your Kraken2/Bracken output files">Choose files&hellip;</button>
+    <input id="folder-input" type="file" multiple style="display: none;" />
     <button class="act" id="themeBtn" type="button" title="Toggle light/dark">&#9680;</button>
   </header>
 
@@ -70,8 +70,8 @@
     <aside id="side">
       <h4>Load a run</h4>
       <div class="hint" id="load-empty-state">
-        Point at a folder containing your Kraken2/Bracken output (<code>.bracken</code> / <code>.breport</code> files,
-        any names). Files are identified by content, not filename or extension.
+        Choose your Kraken2/Bracken output files (<code>.bracken</code> / <code>.breport</code>, any names) — select
+        every file for a run at once. Files are identified by content, not filename or extension.
       </div>
       <ul id="file-ticklist" class="file-ticklist scroll-panel" style="display: none;"></ul>
       <button id="load-selected-btn" class="act" type="button" style="display: none;">Load selected</button>
@@ -103,20 +103,20 @@
         <div class="hero">
           <h1>Clann eDNA Explorer</h1>
           <div class="lead">
-            A free, browser-based explorer for Kraken2/Bracken eDNA metabarcoding results. Point it at a folder
-            of <code>.breport</code>/<code>.bracken</code> output — any names, identified by content — to see
+            A free, browser-based explorer for Kraken2/Bracken eDNA metabarcoding results. Choose your
+            <code>.breport</code>/<code>.bracken</code> output files — any names, identified by content — to see
             per-sample summaries, a Krona-style sunburst, a Pavian-style Sankey diagram, and, once a full run is
             loaded, group-aware multi-sample comparison. Everything runs locally; nothing is uploaded to a server.
           </div>
           <div class="exts">.bracken &middot; .breport &middot; generic CSV/TSV</div>
-          <button id="emptyOpen" type="button">Choose folder&hellip;</button>
+          <button id="emptyOpen" type="button">Choose files&hellip;</button>
           <div class="scroll-hint">&darr; About &amp; FAQ</div>
         </div>
         <section class="about" id="about">
     <h2>About Clann eDNA Explorer</h2>
     <p>
       <strong>Clann eDNA Explorer</strong> is a free, open-source tool for exploring taxonomic classification
-      results from eDNA metabarcoding and metagenomic studies. Point it at a folder of
+      results from eDNA metabarcoding and metagenomic studies. Choose your
       <strong>Kraken2/Bracken</strong> output — <code>.breport</code> and/or <code>.bracken</code> files, any
       names, identified by content rather than filename — and it builds per-sample summaries, a Krona-style
       zoomable sunburst, a Pavian-style Sankey diagram, and, once a full run is loaded, group-aware multi-sample
