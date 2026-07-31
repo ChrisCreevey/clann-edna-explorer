@@ -503,7 +503,12 @@
       })
     );
 
-    const fileInput = el('input', { type: 'file', accept: '.csv,.tsv,.txt', style: 'display:none' });
+    // No `accept` filter: this app identifies files by content, not
+    // extension (see the folder-loader.js note) — a Galaxy-exported
+    // CSV/TSV can easily land with a non-standard extension (e.g.
+    // ".tabular", or none at all), and an accept filter would silently
+    // hide it from the picker.
+    const fileInput = el('input', { type: 'file', style: 'display:none' });
     fileInput.addEventListener('change', async () => {
       const file = fileInput.files[0];
       if (!file) return;
@@ -674,7 +679,12 @@
       })
     );
 
-    const fileInput = el('input', { type: 'file', accept: '.csv,.tsv,.txt', style: 'display:none' });
+    // No `accept` filter: this app identifies files by content, not
+    // extension (see the folder-loader.js note) — a Galaxy-exported
+    // CSV/TSV can easily land with a non-standard extension (e.g.
+    // ".tabular", or none at all), and an accept filter would silently
+    // hide it from the picker.
+    const fileInput = el('input', { type: 'file', style: 'display:none' });
     fileInput.addEventListener('change', async () => {
       const file = fileInput.files[0];
       if (!file) return;
