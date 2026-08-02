@@ -1,0 +1,5 @@
+count	superkingdom	superkingdom_taxid	kingdom	kingdom_taxid	phylum	phylum_taxid	class	class_taxid	order	order_taxid	family	family_taxid	genus	genus_taxid	species	species_taxid
+2	Eukaryota	2759	Metazoa	33208	Chordata	7711	Mammalia	40674	Primates	9443	Hominidae	9604	Homo	9605	Homo sapiens	9606
+1	Eukaryota	2759	Metazoa	33208	Chordata	7711	Mammalia	40674	Rodentia	9989	Muridae	10066	Mus	10088	Mus musculus	10090
+1	Eukaryota	2759	Metazoa	33208	Arthropoda	6656	Insecta	50557	Diptera	7147	Drosophilidae	7214	Drosophila	7215	Drosophila melanogaster	7227
+1	Eukaryota	2759	Fungi	4751	Ascomycota	4890	Saccharomycetes	4891	Saccharomycetales	4892	Saccharomycetaceae	4893	Saccharomyces	4930	Saccharomyces cerevisiae	4932

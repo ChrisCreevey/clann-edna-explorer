@@ -67,6 +67,23 @@ generic names (e.g. from a Galaxy pipeline) still load correctly.
   `.bracken` re-estimate.
 - A run can mix samples that only have one file type or the other —
   each sample just needs at least one of the two.
+- **Lineage TSV** — a hierarchy-aware format for tools that resolve their
+  own taxonomy rather than running Kraken2/Bracken (e.g. BLAST/DIAMOND hits
+  resolved against a taxonomy database). A tab-delimited file with a header
+  row, `count` and `species` columns required, plus any of `superkingdom`,
+  `kingdom`, `phylum`, `class`, `order`, `family`, `genus` (each optionally
+  paired with a `<rank>_taxid` column). One row per unique resolved taxon
+  path; a row with every rank column blank represents unclassified reads.
+  Detected deterministically by its header (high confidence, no manual
+  column mapping needed) and built into the same taxonomy tree as
+  `.breport`, so it gets full rank views, sunburst, Sankey, and multi-sample
+  comparison — not the flat single-sample table the generic fallback below
+  is limited to. See
+  [`examples/blast-explorer-nanopore-sample.lineage.tsv`](examples/blast-explorer-nanopore-sample.lineage.tsv),
+  produced by [Clann BLAST Explorer](https://chriscreevey.github.io/clann-blast-explorer/)'s
+  "Download eDNA Explorer sample" export (BLAST/DIAMOND hits for 5
+  Nanopore reads, resolved against its built-in taxonomy database) — load
+  it here to see the format in action end to end.
 
 ### Generic tab-delimited fallback
 
