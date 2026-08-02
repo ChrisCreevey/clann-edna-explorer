@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Clann eDNA Explorer — Kraken2/Bracken eDNA metabarcoding explorer</title>
-  <meta name="description" content="Free, browser-based explorer for Kraken2/Bracken eDNA metabarcoding results. Load .bracken/.breport files, explore Krona-style sunbursts and Pavian-style Sankey diagrams, compare samples by group, and export to MicrobiomeAnalyst. Nothing is uploaded; everything runs in your browser." />
-  <meta name="keywords" content="eDNA explorer, metabarcoding, Kraken2, Bracken, bracken report, taxonomic classification, Krona chart, Sankey diagram, MicrobiomeAnalyst, metagenomics, microbiome analysis, online eDNA tool" />
+  <meta name="description" content="Free, browser-based explorer for Kraken2/Bracken eDNA metabarcoding results. Load .bracken/.breport files or a Lineage TSV (e.g. exported from Clann BLAST Explorer's BLAST/DIAMOND taxonomy resolution), explore Krona-style sunbursts and Pavian-style Sankey diagrams, compare samples by group, and export to MicrobiomeAnalyst. Nothing is uploaded; everything runs in your browser." />
+  <meta name="keywords" content="eDNA explorer, metabarcoding, Kraken2, Bracken, bracken report, taxonomic classification, lineage TSV, BLAST taxonomy, Krona chart, Sankey diagram, MicrobiomeAnalyst, metagenomics, microbiome analysis, online eDNA tool" />
   <meta name="author" content="CreeveyLab" />
   <link rel="canonical" href="https://chriscreevey.github.io/clann-edna-explorer/" />
   <meta property="og:type" content="website" />
@@ -27,8 +27,8 @@
     "operatingSystem": "Any (modern web browser)",
     "browserRequirements": "Requires JavaScript",
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-    "description": "Free browser-based explorer for Kraken2/Bracken eDNA metabarcoding classification results, with Krona-style sunbursts, Pavian-style Sankey diagrams, multi-sample comparison, and a MicrobiomeAnalyst-format export.",
-    "keywords": "eDNA, metabarcoding, Kraken2, Bracken, Krona, Sankey, MicrobiomeAnalyst, metagenomics",
+    "description": "Free browser-based explorer for Kraken2/Bracken eDNA metabarcoding classification results — or Lineage TSV input from other taxonomy-resolving tools such as Clann BLAST Explorer — with Krona-style sunbursts, Pavian-style Sankey diagrams, multi-sample comparison, and a MicrobiomeAnalyst-format export.",
+    "keywords": "eDNA, metabarcoding, Kraken2, Bracken, lineage TSV, BLAST taxonomy, Krona, Sankey, MicrobiomeAnalyst, metagenomics",
     "author": { "@type": "Organization", "name": "CreeveyLab", "url": "https://www.creeveylab.org/" },
     "codeRepository": "https://github.com/ChrisCreevey/clann-edna-explorer"
   }
@@ -39,7 +39,9 @@
     "@type": "FAQPage",
     "mainEntity": [
       { "@type": "Question", "name": "What input files does Clann eDNA Explorer need?",
-        "acceptedAnswer": { "@type": "Answer", "text": "A Kraken2/Bracken .breport (full taxonomic hierarchy) and/or .bracken (leaf-rank re-estimated counts) file per sample. Files are identified by their content, not their name or extension, so Galaxy exports with generic filenames still work. A generic tab-delimited fallback parser handles output from other classifiers on a best-effort basis." } },
+        "acceptedAnswer": { "@type": "Answer", "text": "A Kraken2/Bracken .breport (full taxonomic hierarchy) and/or .bracken (leaf-rank re-estimated counts) file per sample, or a Lineage TSV file — a hierarchy-aware format for tools that resolve their own taxonomy, such as Clann BLAST Explorer's eDNA Explorer sample export. Files are identified by their content, not their name or extension, so Galaxy exports with generic filenames still work. A generic tab-delimited fallback parser handles output from other classifiers on a best-effort basis." } },
+      { "@type": "Question", "name": "Can I load BLAST or DIAMOND results?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Resolve taxonomy for your BLAST/DIAMOND hits in Clann BLAST Explorer (its built-in taxonomy database resolves full lineage from a staxids value), then use its \"Download eDNA Explorer sample\" export to produce a Lineage TSV. Loading that file here gives it the same full rank views, sunburst, Sankey diagram, and multi-sample comparison as a native Kraken2/Bracken sample — not just a flat name list." } },
       { "@type": "Question", "name": "Is my data uploaded to a server?",
         "acceptedAnswer": { "@type": "Answer", "text": "No. Everything runs client-side in your browser — parsing, visualisation, and every export happen locally. Your classification results never leave your computer." } },
       { "@type": "Question", "name": "Can I compare multiple samples?",
@@ -70,8 +72,9 @@
     <aside id="side">
       <h4>Load a run</h4>
       <div class="hint" id="load-empty-state">
-        Choose your Kraken2/Bracken output files (<code>.bracken</code> / <code>.breport</code>, any names) — select
-        every file for a run at once. Files are identified by content, not filename or extension.
+        Choose your Kraken2/Bracken output files (<code>.bracken</code> / <code>.breport</code>, any names) or a
+        Lineage TSV — select every file for a run at once. Files are identified by content, not filename or
+        extension.
       </div>
       <ul id="file-ticklist" class="file-ticklist scroll-panel" style="display: none;"></ul>
       <button id="load-selected-btn" class="act" type="button" style="display: none;">Load selected</button>
@@ -108,7 +111,7 @@
             per-sample summaries, a Krona-style sunburst, a Pavian-style Sankey diagram, and, once a full run is
             loaded, group-aware multi-sample comparison. Everything runs locally; nothing is uploaded to a server.
           </div>
-          <div class="exts">.bracken &middot; .breport &middot; generic CSV/TSV</div>
+          <div class="exts">.bracken &middot; .breport &middot; Lineage TSV &middot; generic CSV/TSV</div>
           <button id="emptyOpen" type="button">Choose files&hellip;</button>
           <div class="scroll-hint">&darr; About &amp; FAQ</div>
         </div>
@@ -124,6 +127,14 @@
       summary, a Bray-Curtis/Jaccard sample-similarity matrix, and a PCoA ordination plot.
     </p>
     <p>
+      Not running Kraken2/Bracken? A <strong>Lineage TSV</strong> file — full taxonomic lineage per row rather
+      than a flat name — gets exactly the same treatment: rank views, sunburst, Sankey, and full participation
+      in multi-sample comparison. <a href="https://chriscreevey.github.io/clann-blast-explorer/" target="_blank" rel="noopener">Clann BLAST Explorer</a>
+      produces this directly from BLAST/DIAMOND hits (its built-in taxonomy database resolves the full lineage)
+      via its "Download eDNA Explorer sample" export — useful for long-read/Nanopore metabarcoding runs BLASTed
+      or DIAMONDed against a database like NR.
+    </p>
+    <p>
       A run can be filtered live by minimum abundance or a host/contaminant exclusion list, taxa can be searched
       and tagged by category, and sample metadata can be joined in to label samples or pre-populate groups.
       Every diagram exports as SVG or PNG, the filtered taxon table and diversity/similarity summaries export as
@@ -136,10 +147,27 @@
     <h3>What input files does it need?</h3>
     <p>
       A Kraken2/Bracken <code>.breport</code> (full taxonomic hierarchy) and/or <code>.bracken</code> (leaf-rank
-      re-estimated counts) file per sample. Files are identified by their content, not their name or extension,
-      so a Galaxy export with a generic filename still loads correctly. A generic tab-delimited fallback parser
+      re-estimated counts) file per sample, or a <strong>Lineage TSV</strong> file — one row per resolved taxon
+      path, with a name and taxid at every rank rather than a flat name/count pair. Files are identified by their
+      content, not their name or extension, so a Galaxy export with a generic filename still loads correctly.
+      Both a <code>.breport</code>/<code>.bracken</code> sample and a Lineage TSV sample get identical treatment:
+      full rank views, sunburst, Sankey, and multi-sample comparison. A generic tab-delimited fallback parser
       handles output from other classifiers (Kaiju, Centrifuge, MetaPhlAn, ...) on a best-effort basis, with
-      manual column mapping if auto-detection can't confirm the shape.
+      manual column mapping if auto-detection can't confirm the shape — but without a taxonomic hierarchy, so it
+      only feeds the per-sample table, not the diagrams or comparison views.
+    </p>
+
+    <h3>Can I load BLAST or DIAMOND results?</h3>
+    <p>
+      Yes — via a Lineage TSV. Resolve taxonomy for your BLAST/DIAMOND hits in
+      <a href="https://chriscreevey.github.io/clann-blast-explorer/" target="_blank" rel="noopener">Clann BLAST Explorer</a>
+      (its built-in taxonomy database resolves full lineage — superkingdom/domain through species — from a
+      <code>staxids</code> value), filter to your preferred cutoffs, then use its "Download eDNA Explorer sample"
+      export. Each query counts as one read, assigned to its best passing hit's taxon; unmatched queries pool
+      into a single unclassified row. Load the resulting file here the same way as a <code>.breport</code> —
+      it gets the same sunburst, Sankey, and multi-sample comparison treatment, not just a flat name list. See
+      <a href="https://github.com/ChrisCreevey/clann-blast-explorer/blob/main/examples/nanopore-diamond-nr.tsv" target="_blank" rel="noopener">a worked example</a>
+      (and its output, <a href="examples/blast-explorer-nanopore-sample.lineage.tsv">loadable directly here</a>).
     </p>
 
     <h3>Is my data uploaded to a server?</h3>
