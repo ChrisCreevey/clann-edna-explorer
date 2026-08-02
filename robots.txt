@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://chriscreevey.github.io/clann-edna-explorer/sitemap.xml
