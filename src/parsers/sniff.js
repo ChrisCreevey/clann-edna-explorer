@@ -88,6 +88,33 @@ function sniffBreport(lines) {
   return null;
 }
 
+const LINEAGE_TSV_RANKS = ['superkingdom', 'kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species'];
+const LINEAGE_TSV_ALLOWED_COLUMNS = new Set([
+  'count',
+  ...LINEAGE_TSV_RANKS,
+  ...LINEAGE_TSV_RANKS.map((r) => `${r}_taxid`),
+]);
+
+/**
+ * Try matching the Lineage TSV shape: header row whose columns are drawn
+ * only from `count`/`species`/the optional rank + rank_taxid columns, with
+ * `count` and `species` both present, plus at least one data line.
+ */
+function sniffLineageTsv(lines) {
+  if (lines.length < 2) return null;
+  const header = lines[0].split('\t').map((c) => c.trim().toLowerCase());
+  if (header.length === 0) return null;
+  if (!header.every((c) => LINEAGE_TSV_ALLOWED_COLUMNS.has(c))) return null;
+  if (!header.includes('count') || !header.includes('species')) return null;
+
+  const columnIndex = {};
+  lines[0].split('\t').forEach((c, i) => {
+    columnIndex[c.trim().toLowerCase()] = i;
+  });
+
+  return { format: 'lineage-tsv', confidence: 'high', columns: header, columnIndex };
+}
+
 /**
  * Best-effort generic tab-delimited fallback: needs >=2 columns, a
  * consistently numeric candidate abundance column, and a consistently
@@ -145,7 +172,7 @@ function sniffGeneric(lines) {
 
 /**
  * Detect the format of a text file's content. Returns a result object with
- * `format` ("bracken" | "breport" | "generic" | "unknown"), `confidence`
+ * `format` ("bracken" | "breport" | "lineage-tsv" | "generic" | "unknown"), `confidence`
  * ("high" | "unconfirmed" | "none"), and a human-readable `reason` when
  * detection failed or was unconfirmed.
  */
@@ -160,6 +187,9 @@ function sniffFormat(text) {
 
   const breport = sniffBreport(lines);
   if (breport) return breport;
+
+  const lineageTsv = sniffLineageTsv(lines);
+  if (lineageTsv) return lineageTsv;
 
   const generic = sniffGeneric(lines);
   if (generic) {
@@ -177,7 +207,7 @@ function sniffFormat(text) {
   };
 }
 
-const sniffExports = { sniffFormat, firstLines, SNIFF_LINE_LIMIT };
+const sniffExports = { sniffFormat, sniffLineageTsv, firstLines, SNIFF_LINE_LIMIT };
 if (typeof module !== 'undefined' && module.exports) module.exports = sniffExports;
 if (typeof window !== 'undefined') {
   window.ClannEDNA = window.ClannEDNA || {};

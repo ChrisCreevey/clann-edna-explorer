@@ -17,18 +17,22 @@ function guessSampleIdFromFilename(filename) {
  * @param {{text: string, filename: string}} [inputs.breport]
  * @param {{text: string, filename: string}} [inputs.bracken]
  * @param {{text: string, filename: string, mapping: {nameColumn: number, abundanceColumn: number}}} [inputs.generic]
+ * @param {{text: string, filename: string, columnIndex?: object}} [inputs.lineageTsv]
  * @param {import('./taxonomy-tree').TaxonomyTree} tree
- * @param {object} parsers - { parseBreport, parseBracken, parseGeneric, captureProvenance }
+ * @param {object} parsers - { parseBreport, parseBracken, parseGeneric, parseLineageTsv, captureProvenance }
  */
 function buildSample(sampleId, inputs, tree, parsers) {
-  const { parseBreport, parseBracken, parseGeneric, captureProvenance } = parsers;
+  const { parseBreport, parseBracken, parseGeneric, parseLineageTsv, captureProvenance } = parsers;
+
+  const isGeneric = Boolean(inputs.generic) && !inputs.breport && !inputs.bracken && !inputs.lineageTsv;
 
   const sample = {
     id: sampleId,
     displayName: sampleId,
-    kind: inputs.generic ? 'generic' : 'tree',
+    kind: isGeneric ? 'generic' : 'tree',
     hasBreport: Boolean(inputs.breport),
     hasBracken: Boolean(inputs.bracken),
+    hasLineageTsv: Boolean(inputs.lineageTsv),
     provenance: null,
     genericRows: null,
     sourceFiles: [],
@@ -49,6 +53,11 @@ function buildSample(sampleId, inputs, tree, parsers) {
     sample.sourceFiles.push(inputs.bracken.filename);
     const prov = captureProvenance(inputs.bracken.text);
     if (prov) sample.provenance = { ...(sample.provenance || {}), ...prov };
+  }
+
+  if (inputs.lineageTsv) {
+    parseLineageTsv(inputs.lineageTsv.text, tree, sampleId, inputs.lineageTsv.columnIndex);
+    sample.sourceFiles.push(inputs.lineageTsv.filename);
   }
 
   if (inputs.generic) {

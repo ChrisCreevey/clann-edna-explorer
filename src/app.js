@@ -11,6 +11,7 @@
   const { parseBreport } = window.ClannEDNA.breport;
   const { parseBracken } = window.ClannEDNA.bracken;
   const { parseGeneric } = window.ClannEDNA.generic;
+  const { parseLineageTsv } = window.ClannEDNA.lineageTsv;
   const { captureProvenance } = window.ClannEDNA.provenance;
   const { buildHierarchyTree } = window.ClannEDNA.hierarchy;
   const { renderSunburstSVG } = window.ClannEDNA.sunburst;
@@ -32,7 +33,7 @@
   const { computeTaxonDetail } = window.ClannEDNA.taxonDetail;
 
   const BLAST_EXPLORER_URL = 'https://chriscreevey.github.io/clann-blast-explorer/';
-  const parsers = { parseBreport, parseBracken, parseGeneric, captureProvenance };
+  const parsers = { parseBreport, parseBracken, parseGeneric, parseLineageTsv, captureProvenance };
 
   const folderInput = document.getElementById('folder-input');
   const uploadBtn = document.getElementById('uploadBtn');
@@ -75,6 +76,7 @@
   function formatLabel(result) {
     if (result.format === 'bracken') return '.bracken';
     if (result.format === 'breport') return '.breport';
+    if (result.format === 'lineage-tsv') return 'Lineage TSV';
     if (result.format === 'generic') return result.confidence === 'unconfirmed' ? 'generic (unconfirmed)' : 'generic';
     return 'not recognised';
   }
@@ -317,6 +319,8 @@
         bucket.breport = { text, filename: result.file.name };
       } else if (result.format === 'bracken') {
         bucket.bracken = { text, filename: result.file.name };
+      } else if (result.format === 'lineage-tsv') {
+        bucket.lineageTsv = { text, filename: result.file.name, columnIndex: result.columnIndex };
       } else if (result.format === 'generic') {
         const nameColumn = Number(li.querySelector('.name-col-input').value);
         const abundanceColumn = Number(li.querySelector('.abundance-col-input').value);
