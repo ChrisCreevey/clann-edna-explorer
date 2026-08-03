@@ -77,6 +77,8 @@
     if (result.format === 'bracken') return '.bracken';
     if (result.format === 'breport') return '.breport';
     if (result.format === 'lineage-tsv') return 'Lineage TSV';
+    if (result.format === 'qiime-taxonomy') return 'QIIME2 taxonomy.tsv';
+    if (result.format === 'qiime-biom-tsv') return 'QIIME2 feature-table.tsv';
     if (result.format === 'generic') return result.confidence === 'unconfirmed' ? 'generic (unconfirmed)' : 'generic';
     return 'not recognised';
   }
@@ -96,12 +98,21 @@
     checkbox.disabled = !usable;
     checkbox.className = 'row-checkbox';
 
+    const isQiimeWholeRunFile = result.format === 'qiime-taxonomy' || result.format === 'qiime-biom-tsv';
+
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
     nameInput.className = 'sample-name-input';
-    nameInput.value = guessSampleIdFromFilename(result.file.name);
-    nameInput.title = 'Sample name — files sharing this name are merged into one sample';
-    nameInput.disabled = !usable;
+    if (isQiimeWholeRunFile) {
+      nameInput.value = '';
+      nameInput.placeholder =
+        result.format === 'qiime-biom-tsv' ? 'provides every sample in this run' : 'taxonomy lookup — no sample name needed';
+      nameInput.disabled = true;
+    } else {
+      nameInput.value = guessSampleIdFromFilename(result.file.name);
+      nameInput.title = 'Sample name — files sharing this name are merged into one sample';
+      nameInput.disabled = !usable;
+    }
 
     const filename = document.createElement('span');
     filename.textContent = result.file.name;
@@ -302,12 +313,24 @@
   async function loadSelected() {
     const rows = Array.from(tickList.querySelectorAll('li'));
     const grouped = new Map(); // sampleName -> {breport?, bracken?, generic?}
+    let qiimeTaxonomyFile = null;
+    let qiimeBiomTsvFile = null;
 
     for (const li of rows) {
       const checkbox = li.querySelector('.row-checkbox');
       if (!checkbox || !checkbox.checked) continue;
       const index = Number(li.dataset.index);
       const result = currentResults[index];
+
+      if (result.format === 'qiime-taxonomy') {
+        qiimeTaxonomyFile = { text: await result.file.text(), filename: result.file.name };
+        continue;
+      }
+      if (result.format === 'qiime-biom-tsv') {
+        qiimeBiomTsvFile = { text: await result.file.text(), filename: result.file.name };
+        continue;
+      }
+
       const sampleName = li.querySelector('.sample-name-input').value.trim();
       if (!sampleName) continue;
 
@@ -328,9 +351,40 @@
       }
     }
 
-    if (grouped.size === 0) {
+    if (Boolean(qiimeTaxonomyFile) !== Boolean(qiimeBiomTsvFile)) {
+      alert(
+        'A QIIME2 run needs both the taxonomy.tsv and the feature-table.tsv ticked together — tick the other one too before loading.'
+      );
+      return;
+    }
+
+    if (grouped.size === 0 && !qiimeTaxonomyFile) {
       alert('Tick at least one recognised file, and give it a sample name, before loading.');
       return;
+    }
+
+    let firstQiimeSampleId = null;
+    if (qiimeTaxonomyFile && qiimeBiomTsvFile) {
+      const { parseQiimeTaxonomy, buildQiimeSamples } = window.ClannEDNA.qiime;
+      const taxonomyByFeatureId = parseQiimeTaxonomy(qiimeTaxonomyFile.text);
+      const { sampleIds } = buildQiimeSamples(qiimeBiomTsvFile.text, taxonomyByFeatureId, run.tree);
+      for (const sampleId of sampleIds) {
+        run.samples.set(sampleId, {
+          id: sampleId,
+          displayName: sampleId,
+          kind: 'tree',
+          hasBreport: false,
+          hasBracken: false,
+          hasLineageTsv: false,
+          provenance: null,
+          genericRows: null,
+          sourceFiles: [qiimeTaxonomyFile.filename, qiimeBiomTsvFile.filename],
+          group: null,
+          groupSource: null,
+          metadata: null,
+        });
+      }
+      firstQiimeSampleId = sampleIds[0] || null;
     }
 
     for (const [sampleId, inputs] of grouped) {
@@ -338,7 +392,10 @@
       run.samples.set(sampleId, sample);
     }
 
-    activeSampleId = activeSampleId && run.samples.has(activeSampleId) ? activeSampleId : grouped.keys().next().value;
+    activeSampleId =
+      activeSampleId && run.samples.has(activeSampleId)
+        ? activeSampleId
+        : grouped.keys().next().value || firstQiimeSampleId;
 
     // Once a run is loaded, the tick-list has done its job — leaving it
     // sitting there under "Choose files…" is just clutter, so collapse

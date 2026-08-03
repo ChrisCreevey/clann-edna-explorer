@@ -56,65 +56,28 @@ function parseHeader(text) {
 }
 
 /**
- * @param {string} text - full file contents
+ * Shared tree-building core: given rows already resolved into a per-row
+ * ancestor path (name + taxid per rank), attach them to `tree` under
+ * `sampleId` with full clade aggregation. Used directly by parseLineageTsv
+ * below, and reused by the QIIME2 reader (src/parsers/qiime.js), which
+ * arrives at the same {path, count} row shape via a taxonomy.tsv lookup
+ * instead of per-row rank columns.
+ *
+ * @param {{count: number, path: {rank: string, name: string, taxid: number, synthetic: boolean}[]}[]} rows
+ * @param {number} unclassifiedCount
  * @param {import('../model/taxonomy-tree').TaxonomyTree} tree
  * @param {string} sampleId
- * @param {{name: string, taxid: string}[]} [columnIndex] - unused positional
- *   arg kept for signature parity with the brief; the parser derives its
- *   own column map from the header so it's robust when called directly.
- * @returns {{ rowCount: number, totalReads: number }}
+ * @returns {{ totalReads: number }}
  */
-function parseLineageTsv(text, tree, sampleId, columnIndex) {
-  const lines = text.split(/\r?\n/);
-  if (lines.length === 0 || lines[0].trim() === '') return { rowCount: 0, totalReads: 0 };
-
-  const headerCols = parseHeader(text);
-  const col = buildColumnIndex(headerCols);
-
+function buildTreeFromLineageRows(rows, unclassifiedCount, tree, sampleId) {
   tree.getOrCreateNode(ROOT_TAXID, 'root', 'R', 0, null);
 
   const directReads = new Map(); // taxid -> accumulated direct reads
   const topLevelTaxids = new Set(); // taxids attached directly under root
 
-  let rowCount = 0;
-  let unclassifiedCount = 0;
-
-  for (let li = 1; li < lines.length; li++) {
-    const rawLine = lines[li];
-    if (rawLine.trim() === '') continue;
-    const cols = rawLine.split('\t');
-
-    const countIdx = col['count'];
-    const count = Number(countIdx !== undefined ? cols[countIdx] : undefined);
-    if (!Number.isInteger(count) || count < 1) continue;
-
-    const path = [];
-    const nameParts = [];
-    for (const rank of RANKS) {
-      const nameIdx = col[rank];
-      const name = nameIdx !== undefined ? (cols[nameIdx] || '').trim() : '';
-      if (name === '') continue;
-      nameParts.push(name.toLowerCase());
-
-      const taxidIdx = col[`${rank}_taxid`];
-      const taxidStr = taxidIdx !== undefined ? (cols[taxidIdx] || '').trim() : '';
-      let taxid;
-      let synthetic = false;
-      if (taxidStr !== '' && /^-?\d+$/.test(taxidStr)) {
-        taxid = Number(taxidStr);
-      } else {
-        taxid = syntheticTaxid(nameParts.join('|'));
-        synthetic = true;
-      }
-      path.push({ rank, name, taxid, synthetic });
-    }
-
-    rowCount++;
-
-    if (path.length === 0) {
-      unclassifiedCount += count;
-      continue;
-    }
+  for (const row of rows) {
+    const { count, path } = row;
+    if (path.length === 0) continue;
 
     let parentTaxid = ROOT_TAXID;
     for (let d = 0; d < path.length; d++) {
@@ -184,10 +147,75 @@ function parseLineageTsv(text, tree, sampleId, columnIndex) {
     });
   }
 
+  return { totalReads };
+}
+
+/**
+ * @param {string} text - full file contents
+ * @param {import('../model/taxonomy-tree').TaxonomyTree} tree
+ * @param {string} sampleId
+ * @param {{name: string, taxid: string}[]} [columnIndex] - unused positional
+ *   arg kept for signature parity with the brief; the parser derives its
+ *   own column map from the header so it's robust when called directly.
+ * @returns {{ rowCount: number, totalReads: number }}
+ */
+function parseLineageTsv(text, tree, sampleId, columnIndex) {
+  const lines = text.split(/\r?\n/);
+  if (lines.length === 0 || lines[0].trim() === '') return { rowCount: 0, totalReads: 0 };
+
+  const headerCols = parseHeader(text);
+  const col = buildColumnIndex(headerCols);
+
+  const rows = [];
+  let rowCount = 0;
+  let unclassifiedCount = 0;
+
+  for (let li = 1; li < lines.length; li++) {
+    const rawLine = lines[li];
+    if (rawLine.trim() === '') continue;
+    const cols = rawLine.split('\t');
+
+    const countIdx = col['count'];
+    const count = Number(countIdx !== undefined ? cols[countIdx] : undefined);
+    if (!Number.isInteger(count) || count < 1) continue;
+
+    const path = [];
+    const nameParts = [];
+    for (const rank of RANKS) {
+      const nameIdx = col[rank];
+      const name = nameIdx !== undefined ? (cols[nameIdx] || '').trim() : '';
+      if (name === '') continue;
+      nameParts.push(name.toLowerCase());
+
+      const taxidIdx = col[`${rank}_taxid`];
+      const taxidStr = taxidIdx !== undefined ? (cols[taxidIdx] || '').trim() : '';
+      let taxid;
+      let synthetic = false;
+      if (taxidStr !== '' && /^-?\d+$/.test(taxidStr)) {
+        taxid = Number(taxidStr);
+      } else {
+        taxid = syntheticTaxid(nameParts.join('|'));
+        synthetic = true;
+      }
+      path.push({ rank, name, taxid, synthetic });
+    }
+
+    rowCount++;
+
+    if (path.length === 0) {
+      unclassifiedCount += count;
+      continue;
+    }
+
+    rows.push({ count, path });
+  }
+
+  const { totalReads } = buildTreeFromLineageRows(rows, unclassifiedCount, tree, sampleId);
+
   return { rowCount, totalReads };
 }
 
-const lineageTsvExports = { parseLineageTsv, syntheticTaxid, RANKS, RANK_CODE };
+const lineageTsvExports = { parseLineageTsv, buildTreeFromLineageRows, syntheticTaxid, RANKS, RANK_CODE };
 if (typeof module !== 'undefined' && module.exports) module.exports = lineageTsvExports;
 if (typeof window !== 'undefined') {
   window.ClannEDNA = window.ClannEDNA || {};

@@ -85,6 +85,31 @@ generic names (e.g. from a Galaxy pipeline) still load correctly.
   Nanopore reads, resolved against its built-in taxonomy database) — load
   it here to see the format in action end to end.
 
+### QIIME 2
+
+QIIME 2's `FeatureTable[Frequency]` + `FeatureData[Taxonomy]` artifact pair
+is supported, exported to plain text first (no in-browser `.qza`/HDF5
+decoding yet — see "Planned" below):
+
+```sh
+qiime tools export --input-path table.qza --output-path exported-table
+biom convert -i exported-table/feature-table.biom -o feature-table.tsv --to-tsv
+
+qiime tools export --input-path taxonomy.qza --output-path exported-taxonomy
+# produces exported-taxonomy/taxonomy.tsv directly, no extra conversion needed
+```
+
+Select both `feature-table.tsv` and `taxonomy.tsv` together (they're
+identified by content, so the filenames above are just what `qiime tools
+export` happens to produce by default). Unlike `.breport`/`.bracken`,
+where each file is one sample, this pair loads **every sample column in
+the feature table at once** — there's no per-file sample-name field for
+these two rows in the file list, since the sample names come from the
+feature table's own header. Features whose ID doesn't appear in
+`taxonomy.tsv`, or whose taxon string resolves to no ranks at all (e.g.
+`Unassigned`), are counted as unclassified reads for that sample rather
+than dropped.
+
 ### Generic tab-delimited fallback
 
 If a file isn't recognised as `.breport` or `.bracken`, it's tried as a
@@ -102,15 +127,18 @@ a MetaPhlAn abundance table) — see below for planned native support.
 
 ## Planned: native support for other classifiers
 
-Right now, anything other than Kraken2/Bracken goes through the generic
-tab-delimited fallback above. A future update will add native parsing
-(full taxonomic hierarchy, not just a flat table) for other common
-classifier outputs, likely including:
+Right now, anything other than Kraken2/Bracken/QIIME 2 goes through the
+generic tab-delimited fallback above. A future update will add native
+parsing (full taxonomic hierarchy, not just a flat table) for other
+common classifier outputs, likely including:
 
 - **Kaiju** (`kaiju2table` summary output)
 - **Centrifuge**
 - **MetaPhlAn**
-- **QIIME 2** (feature-table/taxonomy exports)
+- **QIIME 2** raw `.qza` artifacts read directly in-browser (no
+  `qiime tools export`/`biom convert` step) — the feature table is HDF5
+  inside a zip, so this needs an in-browser HDF5 reader; the plain-text
+  export pair above works today without it.
 
 If you use a classifier that isn't listed here and want it supported,
 [open an issue](https://github.com/chriscreevey/clann-edna-explorer/issues/new/choose).

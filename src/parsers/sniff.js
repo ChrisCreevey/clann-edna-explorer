@@ -116,6 +116,39 @@ function sniffLineageTsv(lines) {
 }
 
 /**
+ * Try matching QIIME2's exported `taxonomy.tsv` shape (from a
+ * FeatureData[Taxonomy] artifact, `qiime tools export`'d or unzipped
+ * directly): header starts with `Feature ID`, `Taxon`, optionally
+ * `Confidence`.
+ */
+function sniffQiimeTaxonomy(lines) {
+  if (lines.length < 2) return null;
+  const header = lines[0].split('\t').map((c) => c.trim().toLowerCase());
+  if (header[0] !== 'feature id' || header[1] !== 'taxon') return null;
+  return { format: 'qiime-taxonomy', confidence: 'high', columns: header };
+}
+
+/**
+ * Try matching a biom feature table exported to TSV via
+ * `biom convert --to-tsv` (from a FeatureTable[Frequency] artifact): an
+ * optional leading `# Constructed from biom file` comment, then a header
+ * row starting with `#OTU ID` followed by one column per sample.
+ */
+function sniffQiimeBiomTsv(lines) {
+  let headerLine = null;
+  for (const line of lines.slice(0, 2)) {
+    if (line.trim().toLowerCase().startsWith('#otu id')) {
+      headerLine = line;
+      break;
+    }
+  }
+  if (!headerLine) return null;
+  const cols = headerLine.split('\t');
+  if (cols.length < 2) return null;
+  return { format: 'qiime-biom-tsv', confidence: 'high', sampleIds: cols.slice(1).map((c) => c.trim()) };
+}
+
+/**
  * Best-effort generic tab-delimited fallback: needs >=2 columns, a
  * consistently numeric candidate abundance column, and a consistently
  * non-numeric candidate taxon-name column. Always returned as "unconfirmed"
@@ -191,6 +224,12 @@ function sniffFormat(text) {
   const lineageTsv = sniffLineageTsv(lines);
   if (lineageTsv) return lineageTsv;
 
+  const qiimeTaxonomy = sniffQiimeTaxonomy(lines);
+  if (qiimeTaxonomy) return qiimeTaxonomy;
+
+  const qiimeBiomTsv = sniffQiimeBiomTsv(lines);
+  if (qiimeBiomTsv) return qiimeBiomTsv;
+
   const generic = sniffGeneric(lines);
   if (generic) {
     return {
@@ -207,7 +246,14 @@ function sniffFormat(text) {
   };
 }
 
-const sniffExports = { sniffFormat, sniffLineageTsv, firstLines, SNIFF_LINE_LIMIT };
+const sniffExports = {
+  sniffFormat,
+  sniffLineageTsv,
+  sniffQiimeTaxonomy,
+  sniffQiimeBiomTsv,
+  firstLines,
+  SNIFF_LINE_LIMIT,
+};
 if (typeof module !== 'undefined' && module.exports) module.exports = sniffExports;
 if (typeof window !== 'undefined') {
   window.ClannEDNA = window.ClannEDNA || {};

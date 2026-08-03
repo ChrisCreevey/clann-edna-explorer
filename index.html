@@ -39,7 +39,7 @@
     "@type": "FAQPage",
     "mainEntity": [
       { "@type": "Question", "name": "What input files does Clann eDNA Explorer need?",
-        "acceptedAnswer": { "@type": "Answer", "text": "A Kraken2/Bracken .breport (full taxonomic hierarchy) and/or .bracken (leaf-rank re-estimated counts) file per sample, or a Lineage TSV file — a hierarchy-aware format for tools that resolve their own taxonomy, such as Clann BLAST Explorer's eDNA Explorer sample export. Files are identified by their content, not their name or extension, so Galaxy exports with generic filenames still work. A generic tab-delimited fallback parser handles output from other classifiers on a best-effort basis." } },
+        "acceptedAnswer": { "@type": "Answer", "text": "A Kraken2/Bracken .breport (full taxonomic hierarchy) and/or .bracken (leaf-rank re-estimated counts) file per sample, a Lineage TSV file — a hierarchy-aware format for tools that resolve their own taxonomy, such as Clann BLAST Explorer's eDNA Explorer sample export — or a QIIME 2 feature-table.tsv + taxonomy.tsv pair exported from a FeatureTable[Frequency]/FeatureData[Taxonomy] artifact. Files are identified by their content, not their name or extension, so Galaxy exports with generic filenames still work. A generic tab-delimited fallback parser handles output from other classifiers on a best-effort basis." } },
       { "@type": "Question", "name": "Can I load BLAST or DIAMOND results?",
         "acceptedAnswer": { "@type": "Answer", "text": "Yes. Resolve taxonomy for your BLAST/DIAMOND hits in Clann BLAST Explorer (its built-in taxonomy database resolves full lineage from a staxids value), then use its \"Download eDNA Explorer sample\" export to produce a Lineage TSV. Loading that file here gives it the same full rank views, sunburst, Sankey diagram, and multi-sample comparison as a native Kraken2/Bracken sample — not just a flat name list." } },
       { "@type": "Question", "name": "Is my data uploaded to a server?",
@@ -111,7 +111,7 @@
             per-sample summaries, a Krona-style sunburst, a Pavian-style Sankey diagram, and, once a full run is
             loaded, group-aware multi-sample comparison. Everything runs locally; nothing is uploaded to a server.
           </div>
-          <div class="exts">.bracken &middot; .breport &middot; Lineage TSV &middot; generic CSV/TSV</div>
+          <div class="exts">.bracken &middot; .breport &middot; Lineage TSV &middot; QIIME 2 &middot; generic CSV/TSV</div>
           <button id="emptyOpen" type="button">Choose files&hellip;</button>
           <div class="scroll-hint">&darr; About &amp; FAQ</div>
         </div>
@@ -147,11 +147,13 @@
     <h3>What input files does it need?</h3>
     <p>
       A Kraken2/Bracken <code>.breport</code> (full taxonomic hierarchy) and/or <code>.bracken</code> (leaf-rank
-      re-estimated counts) file per sample, or a <strong>Lineage TSV</strong> file — one row per resolved taxon
-      path, with a name and taxid at every rank rather than a flat name/count pair. Files are identified by their
-      content, not their name or extension, so a Galaxy export with a generic filename still loads correctly.
-      Both a <code>.breport</code>/<code>.bracken</code> sample and a Lineage TSV sample get identical treatment:
-      full rank views, sunburst, Sankey, and multi-sample comparison. A generic tab-delimited fallback parser
+      re-estimated counts) file per sample, a <strong>Lineage TSV</strong> file — one row per resolved taxon
+      path, with a name and taxid at every rank rather than a flat name/count pair — or a
+      <strong>QIIME 2</strong> <code>feature-table.tsv</code> + <code>taxonomy.tsv</code> pair exported from a
+      <code>FeatureTable[Frequency]</code>/<code>FeatureData[Taxonomy]</code> artifact (see below). Files are
+      identified by their content, not their name or extension, so a Galaxy export with a generic filename still
+      loads correctly. Every one of these gets identical treatment: full rank views, sunburst, Sankey, and
+      multi-sample comparison. A generic tab-delimited fallback parser
       handles output from other classifiers (Kaiju, Centrifuge, MetaPhlAn, ...) on a best-effort basis, with
       manual column mapping if auto-detection can't confirm the shape — but without a taxonomic hierarchy, so it
       only feeds the per-sample table, not the diagrams or comparison views.
@@ -168,6 +170,25 @@
       it gets the same sunburst, Sankey, and multi-sample comparison treatment, not just a flat name list. See
       <a href="https://github.com/ChrisCreevey/clann-blast-explorer/blob/main/examples/nanopore-diamond-nr.tsv" target="_blank" rel="noopener">a worked example</a>
       (and its output, <a href="examples/blast-explorer-nanopore-sample.lineage.tsv">loadable directly here</a>).
+    </p>
+
+    <h3>Does it support QIIME 2?</h3>
+    <p>
+      Yes, via QIIME 2's exported plain-text files rather than the raw <code>.qza</code> archive (which packages
+      the feature table as HDF5 inside a zip — not something a browser can decode without extra tooling yet).
+      Export both halves of the pair and load them together:
+    </p>
+    <pre><code>qiime tools export --input-path table.qza --output-path exported-table
+biom convert -i exported-table/feature-table.biom -o feature-table.tsv --to-tsv
+
+qiime tools export --input-path taxonomy.qza --output-path exported-taxonomy</code></pre>
+    <p>
+      Select the resulting <code>feature-table.tsv</code> and <code>taxonomy.tsv</code> together — as with every
+      other format, they're identified by content, not filename. Unlike <code>.breport</code>/<code>.bracken</code>,
+      where each file is one sample, this pair loads every sample column in the feature table in one go, so
+      there's no separate sample-name field for these two rows. Features with no match in
+      <code>taxonomy.tsv</code>, or an unresolved taxon string (e.g. <code>Unassigned</code>), count as
+      unclassified reads for that sample rather than being dropped.
     </p>
 
     <h3>Is my data uploaded to a server?</h3>
@@ -250,6 +271,7 @@
   <script src="src/parsers/bracken.js"></script>
   <script src="src/parsers/generic.js"></script>
   <script src="src/parsers/lineage-tsv.js"></script>
+  <script src="src/parsers/qiime.js"></script>
   <script src="src/parsers/provenance.js"></script>
   <script src="src/parsers/folder-loader.js"></script>
   <script src="src/parsers/sample-metadata.js"></script>
