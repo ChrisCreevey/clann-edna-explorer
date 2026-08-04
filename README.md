@@ -142,22 +142,25 @@ formal normalization anywhere in the tool.
 Downstream, each view then works from either raw counts or each sample's
 own relative proportions, depending on what the view is for:
 
-- **Relative proportions** (depth-independent) — the stacked composition
-  chart, the per-sample rank table's "% of total" column, the diversity
-  summary (richness/Shannon/Simpson), and Bray-Curtis distance (feeding
-  both the sample-similarity matrix and the PCoA ordination plot).
-- **Raw read counts** (depth-sensitive, by design) — the abundance
-  heatmap, so actual sequencing depth is visible at a glance; and the
-  Jaccard distance/presence-absence matrix, which call a taxon "present"
-  once it clears a raw-read-count threshold, not a percentage. The
-  heatmap's hover tooltip shows both the raw count a cell is coloured
-  from and that cell's % of the sample's total, so the depth-independent
-  read is available without leaving the heatmap.
+- **Relative proportions** (depth-independent) — the abundance heatmap's
+  colour, the stacked composition chart's default "% of sample" display,
+  the per-sample rank table's "% of total" column, the diversity summary
+  (richness/Shannon/Simpson), and Bray-Curtis distance (feeding both the
+  sample-similarity matrix and the PCoA ordination plot).
+- **Raw read counts** (depth-sensitive, by design where used) — the
+  stacked composition chart has a "Read count" display toggle alongside
+  its default "% of sample" view, for when bar height itself should show
+  depth differences; and the Jaccard distance/presence-absence matrix,
+  which call a taxon "present" once it clears a raw-read-count
+  threshold, not a percentage. The heatmap's hover tooltip always shows
+  both figures for a cell — its % of that sample's total (what the
+  colour is based on) and the raw read count behind it.
 
-CSV exports carry the same counts as their on-screen view: the rank
-table export has both raw reads and percent-of-total columns; the
-merged abundance matrix export is raw counts only (matching the
-heatmap); the diversity summary export is proportion-based; the
+CSV exports carry raw counts, not the percentages shown on screen where
+applicable: the rank table export has both raw reads and
+percent-of-total columns; the merged abundance matrix export is raw
+counts only — deliberately not the percentages the heatmap is now
+coloured from; the diversity summary export is proportion-based; the
 similarity/distance matrix export is the distance values themselves
 (Bray-Curtis proportion-based, Jaccard raw-count-threshold), not counts;
 and the MicrobiomeAnalyst export is raw counts throughout, matching what

@@ -15,16 +15,28 @@
 
   /**
    * @param {HTMLElement} container
-   * @param {{taxonNames: string[], series: Array<{sampleId: string, values: Array<{name:string, pct:number}>, otherPct: number}>}} data
-   * @param {{width?: number, height?: number, sampleLabels?: Record<string,string>, isTaxonHighlighted?: (name:string) => boolean, onLegendClick?: (name:string) => void}} [options]
+   * @param {{taxonNames: string[], series: Array<{sampleId: string, total: number, values: Array<{name:string, value:number, pct:number}>, otherValue: number, otherPct: number}>}} data
+   * @param {{width?: number, height?: number, sampleLabels?: Record<string,string>, isTaxonHighlighted?: (name:string) => boolean, onLegendClick?: (name:string) => void, mode?: 'pct'|'raw'}} [options]
+   *   `mode: 'pct'` (default) normalizes every bar to a 100%-tall stack —
+   *   comparable composition regardless of sequencing depth. `mode: 'raw'`
+   *   scales every bar against one shared read-count axis (each sample's
+   *   `total`), so bar height itself shows depth differences between samples.
    */
   function renderStackedBarSVG(container, data, options = {}) {
+    const mode = options.mode === 'raw' ? 'raw' : 'pct';
+    const axisWidth = 44; // reserved left margin for the y-axis ticks/labels
     const width = options.width ?? Math.max(500, data.series.length * 70);
     const barGap = 12;
-    const barWidth = Math.min(60, (width - barGap * (data.series.length + 1)) / data.series.length);
+    const barAreaWidth = width - axisWidth;
+    const barWidth = Math.min(60, (barAreaWidth - barGap * (data.series.length + 1)) / data.series.length);
     const chartTop = 10;
     const chartHeight = options.chartHeight ?? 280;
     const labelFn = options.sampleLabels || ((id) => id);
+    // In % mode every bar is scaled to the same 100. In raw mode every bar
+    // shares one read-count scale (the largest sample total in view), so a
+    // shallow sample's bar reads visibly shorter rather than being
+    // stretched to fill the same height as a deep one.
+    const yMax = mode === 'raw' ? Math.max(1, ...data.series.map((s) => s.total)) : 100;
     // Font is 10px; ~6px/char sizes the rotated (-60deg) label's vertical
     // extent from the actual "sample (group)" text so long group names
     // don't run into the legend below them.
@@ -72,14 +84,46 @@
     svg.setAttribute('width', '100%');
     svg.setAttribute('height', height);
 
+    // Y-axis: gridlines + labels at quarter increments of yMax. In % mode
+    // that's the fixed, familiar 0/25/50/75/100 scale; in raw mode it's
+    // read counts, so a shallow sample's shorter bar is legible against an
+    // actual number, not just relative to its neighbours.
+    const tickCount = 4;
+    for (let t = 0; t <= tickCount; t++) {
+      const tickValue = (yMax / tickCount) * t;
+      const tickY = chartTop + chartHeight - (tickValue / yMax) * chartHeight;
+      const gridline = document.createElementNS(STACKED_BAR_SVG_NS, 'line');
+      gridline.setAttribute('x1', axisWidth);
+      gridline.setAttribute('x2', width);
+      gridline.setAttribute('y1', tickY);
+      gridline.setAttribute('y2', tickY);
+      gridline.setAttribute('stroke', 'var(--line)');
+      gridline.setAttribute('stroke-width', '1');
+      gridline.setAttribute('opacity', t === 0 ? '0.6' : '0.25');
+      svg.appendChild(gridline);
+
+      const tickLabel = document.createElementNS(STACKED_BAR_SVG_NS, 'text');
+      tickLabel.setAttribute('x', axisWidth - 6);
+      tickLabel.setAttribute('y', tickY + 3);
+      tickLabel.setAttribute('font-size', '9');
+      tickLabel.setAttribute('fill', 'var(--muted)');
+      tickLabel.setAttribute('text-anchor', 'end');
+      tickLabel.textContent = mode === 'raw'
+        ? Math.round(tickValue).toLocaleString()
+        : `${Math.round(tickValue)}%`;
+      svg.appendChild(tickLabel);
+    }
+
     data.series.forEach((sample, i) => {
-      const x = barGap + i * (barWidth + barGap);
+      const x = axisWidth + barGap + i * (barWidth + barGap);
       let y = chartTop + chartHeight;
 
-      const segments = [...sample.values, { name: 'Other', pct: sample.otherPct }];
+      const segments = mode === 'raw'
+        ? [...sample.values.map((v) => ({ ...v, height: v.value })), { name: 'Other', pct: sample.otherPct, height: sample.otherValue }]
+        : [...sample.values.map((v) => ({ ...v, height: v.pct })), { name: 'Other', pct: sample.otherPct, height: sample.otherPct }];
       segments.forEach((seg) => {
-        if (seg.pct <= 0) return;
-        const segHeight = (seg.pct / 100) * chartHeight;
+        if (seg.height <= 0) return;
+        const segHeight = (seg.height / yMax) * chartHeight;
         y -= segHeight;
         const rect = document.createElementNS(STACKED_BAR_SVG_NS, 'rect');
         rect.setAttribute('x', x);
@@ -96,7 +140,10 @@
           rect.setAttribute('stroke-width', '2');
         }
         const title = document.createElementNS(STACKED_BAR_SVG_NS, 'title');
-        title.textContent = `${seg.name}: ${seg.pct.toFixed(2)}%${category ? ` [${category}]` : ''}`;
+        // Tooltip always shows both figures regardless of display mode —
+        // the raw count and the % of that sample's total.
+        const rawText = seg.name === 'Other' ? sample.otherValue : seg.value;
+        title.textContent = `${seg.name}: ${seg.pct.toFixed(2)}% (${rawText.toLocaleString()} reads)${category ? ` [${category}]` : ''}`;
         rect.appendChild(title);
         svg.appendChild(rect);
       });

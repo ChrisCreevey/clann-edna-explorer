@@ -1593,6 +1593,7 @@
   // ---- Multi-sample comparison core -------------------------------------
 
   let stackedBarTopN = 10;
+  let stackedBarMode = 'pct'; // 'pct' | 'raw' — see renderStackedBarSVG for what each does
   let heatmapMaxRows = 50;
   let presenceThreshold = 1;
   let similarityMetric = 'bray-curtis';
@@ -1635,12 +1636,35 @@
     topNRow.appendChild(topNInput);
     section.appendChild(topNRow);
 
+    // Display mode: % normalizes every bar to the same 100%-tall stack
+    // (composition is directly comparable regardless of depth); raw counts
+    // scales every bar against one shared read-count axis, so bar height
+    // itself shows sequencing-depth differences between samples.
+    const modeRow = el('div', { className: 'topn-controls' });
+    const modeSelect = el('select');
+    [
+      ['pct', '% of sample'],
+      ['raw', 'Read count'],
+    ].forEach(([value, label]) => {
+      const opt = el('option', { value, text: label });
+      opt.selected = value === stackedBarMode;
+      modeSelect.appendChild(opt);
+    });
+    modeSelect.addEventListener('change', () => {
+      stackedBarMode = modeSelect.value;
+      renderResults();
+    });
+    modeRow.appendChild(el('label', { text: 'Display: ' }));
+    modeRow.appendChild(modeSelect);
+    section.appendChild(modeRow);
+
     const tagResolver = currentTagResolver();
 
     const stackedHost = el('div', { className: 'stacked-bar-host' });
     section.appendChild(stackedHost);
     const stackedData = computeStackedComposition(run.tree, sampleIds, comparisonRank, stackedBarTopN, currentFilters());
     renderStackedBarSVG(stackedHost, stackedData, {
+      mode: stackedBarMode,
       sampleLabels: sampleGroupLabelFn(included),
       isTaxonHighlighted: (name) => comparisonHighlightMatch(name, null),
       onLegendClick: (name) => {
@@ -1658,10 +1682,19 @@
 
     // Abundance heatmap
     section.appendChild(el('h4', { text: 'Abundance heatmap' }));
+    // Cell colour is % of each sample's total (depth-independent — a
+    // taxon that's actually more prevalent reads darker regardless of how
+    // deeply that particular sample was sequenced), which is what makes
+    // colour meaningful to compare across columns. The raw read count a
+    // sample's sequencing depth is still one hover away via tooltipMatrix
+    // below, and the CSV export (built from rawAbundanceMatrix, not this
+    // one) stays raw counts for downstream tools that expect them.
     const abundanceMatrix = buildAbundanceMatrix(run.tree, sampleIds, comparisonRank, {
+      valueField: 'pctOfTotal',
+      secondaryValueField: 'cladeReads',
       filters: currentFilters(),
-      secondaryValueField: 'pctOfTotal',
     });
+    const rawAbundanceMatrix = { taxa: abundanceMatrix.taxa, sampleIds: abundanceMatrix.sampleIds, matrix: abundanceMatrix.secondaryMatrix };
     const cappedAbundance = {
       ...abundanceMatrix,
       taxa: abundanceMatrix.taxa.slice(0, heatmapMaxRows),
@@ -1673,7 +1706,7 @@
     section.appendChild(
       el('p', {
         className: 'row-count',
-        text: `Showing top ${Math.min(heatmapMaxRows, abundanceMatrix.taxa.length)} of ${abundanceMatrix.taxa.length} taxa by total abundance.`,
+        text: `Showing top ${Math.min(heatmapMaxRows, abundanceMatrix.taxa.length)} of ${abundanceMatrix.taxa.length} taxa by total relative abundance.`,
       })
     );
     const heatmapHost = el('div', { className: 'heatmap-host scroll-panel' });
@@ -1682,12 +1715,9 @@
       rowLabels: cappedAbundance.taxa.map((t) => t.name),
       colLabels: sampleIds.map(sampleGroupLabelFn(included)),
       matrix: cappedAbundance.matrix,
-      // Cell colour stays raw-count-based (see the read-count-scaling FAQ
-      // for why), but the hover tooltip also reports % of that sample's
-      // total — depth-independent, and usually what you actually want
-      // when comparing a cell across samples of differing sequencing depth.
+      valueUnit: '%',
       tooltipMatrix: cappedAbundance.secondaryMatrix,
-      tooltipUnit: '%',
+      tooltipUnit: ' reads',
       colGroupColors,
       isRowHighlighted: (name) => comparisonHighlightMatch(name, null),
       tagForRow,
@@ -1697,13 +1727,13 @@
     section.appendChild(
       el('p', {
         className: 'hint',
-        text: `Exports every taxon at the "${comparisonRank}" rank selected above (not just the top ${heatmapMaxRows} shown), as raw read counts — the same counts the heatmap is coloured from, not percentages.`,
+        text: `Exports every taxon at the "${comparisonRank}" rank selected above (not just the top ${heatmapMaxRows} shown), as raw read counts — not the percentages the heatmap above is now coloured from.`,
       })
     );
     const abundanceCsvBtn = el('button', { className: 'act', type: 'button', text: 'Export full matrix as CSV' });
     abundanceCsvBtn.addEventListener('click', () => {
       const groupBySampleId = Object.fromEntries(included.map((s) => [s.id, s.group || '']));
-      downloadTextFile(`abundance-matrix-${comparisonRank}.csv`, abundanceMatrixToCsv(abundanceMatrix, groupBySampleId));
+      downloadTextFile(`abundance-matrix-${comparisonRank}.csv`, abundanceMatrixToCsv(rawAbundanceMatrix, groupBySampleId));
     });
     section.appendChild(el('div', { className: 'diagram-export-row' }, [abundanceCsvBtn]));
 
@@ -1719,7 +1749,11 @@
     thresholdRow.appendChild(thresholdInput);
     section.appendChild(thresholdRow);
 
-    const presenceAbsence = toPresenceAbsence(cappedAbundance, presenceThreshold);
+    // Presence/absence calls a taxon "present" against a raw-read-count
+    // threshold (see the label below), so it must run on cappedAbundance's
+    // raw-count secondaryMatrix, not its now-percentage matrix.
+    const cappedRawAbundance = { taxa: cappedAbundance.taxa, sampleIds: cappedAbundance.sampleIds, matrix: cappedAbundance.secondaryMatrix };
+    const presenceAbsence = toPresenceAbsence(cappedRawAbundance, presenceThreshold);
     const presenceHost = el('div', { className: 'heatmap-host scroll-panel' });
     section.appendChild(presenceHost);
     renderHeatmapSVG(presenceHost, {

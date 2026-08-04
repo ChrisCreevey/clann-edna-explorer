@@ -93,7 +93,15 @@
    * Mirrors the single-sample Top-N chart's approach (src/model/
    * rank-table.js computeTopN), applied per sample instead of globally.
    *
-   * @returns {{taxonNames: string[], series: Array<{sampleId: string, values: Array<{name: string, pct: number}>, otherPct: number}>}}
+   * Each segment (and the "Other" bucket) carries both `value` (raw
+   * cladeReads) and `pct` (that sample's % of total) — the chart picks
+   * whichever drives bar height depending on its raw/% display mode, but
+   * the tooltip always has both regardless of mode. `total` is the
+   * sample's own grand total at this rank (post-filter), needed as the
+   * per-column height in raw mode and as the shared-scale reference
+   * across columns.
+   *
+   * @returns {{taxonNames: string[], series: Array<{sampleId: string, total: number, values: Array<{name: string, value: number, pct: number}>, otherValue: number, otherPct: number}>}}
    */
   function computeStackedComposition(tree, sampleIds, rank, maxTaxa = 10, filters = null) {
     const { taxa, matrix, sampleIds: cols } = buildAbundanceMatrix(tree, sampleIds, rank, { valueField: 'cladeReads', filters });
@@ -121,10 +129,18 @@
       const total = columnTotals[colIdx] || 1;
       const values = topIndices.map((rowIdx) => ({
         name: taxa[rowIdx].name,
+        value: matrix[rowIdx][colIdx],
         pct: (100 * matrix[rowIdx][colIdx]) / total,
       }));
-      const topSum = values.reduce((s, v) => s + v.pct, 0);
-      return { sampleId, values, otherPct: Math.max(0, 100 - topSum) };
+      const topValueSum = values.reduce((s, v) => s + v.value, 0);
+      const topPctSum = values.reduce((s, v) => s + v.pct, 0);
+      return {
+        sampleId,
+        total,
+        values,
+        otherValue: Math.max(0, total - topValueSum),
+        otherPct: Math.max(0, 100 - topPctSum),
+      };
     });
 
     return { taxonNames: topTaxa.map((t) => t.name), series };

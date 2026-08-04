@@ -41,10 +41,11 @@
    *   labelWidth?: number,
    *   showValues?: boolean,
    *   isRowHighlighted?: (label: string) => boolean,
-   *   tooltipMatrix?: number[][],   // same shape as matrix; if given, the hover tooltip
-   *                                 // reports this value instead of matrix's own (e.g. cell
-   *                                 // colour is raw read count, but the tooltip shows % of total)
-   *   tooltipUnit?: string,         // appended after the tooltipMatrix value, e.g. '%'
+   *   valueUnit?: string,           // appended after matrix's own value in the tooltip, e.g. '%'
+   *   tooltipMatrix?: number[][],   // same shape as matrix; if given, the hover tooltip adds
+   *                                 // this value in parentheses alongside matrix's own (e.g. cell
+   *                                 // colour is % of total, tooltip also shows the raw read count)
+   *   tooltipUnit?: string,         // appended after the tooltipMatrix value, e.g. ' reads'
    * }} spec
    */
   function renderHeatmapSVG(container, spec) {
@@ -61,6 +62,7 @@
       isRowHighlighted = null,
       tagForRow = null,
       colorForCategory = null,
+      valueUnit = '',
       tooltipMatrix = null,
       tooltipUnit = '',
     } = spec;
@@ -162,14 +164,19 @@
           rect.setAttribute('stroke-width', '2');
         }
         const title = document.createElementNS(HEATMAP_SVG_NS, 'title');
-        const valueText = Number.isInteger(value) ? String(value) : value.toFixed(3);
-        // Cell colour is `value` (often raw counts, e.g. the abundance
-        // heatmap, by design — see index.html's read-count-scaling FAQ);
-        // tooltipMatrix, when given, adds a second figure (typically %
-        // of that sample's total) alongside it so hovering gives both the
-        // exact count and the depth-independent read without needing a
-        // separate view.
-        const secondaryText = tooltipMatrix ? ` (${tooltipMatrix[r][c].toFixed(2)}${tooltipUnit})` : '';
+        // valueUnit (e.g. '%') means `value` is a percentage — format to 2dp
+        // with commas suppressed, matching the app's other %-of-total
+        // displays. Otherwise fall back to the original count/distance
+        // formatting used by the presence/absence and similarity heatmaps.
+        const valueText = valueUnit
+          ? `${value.toFixed(2)}${valueUnit}`
+          : Number.isInteger(value) ? value.toLocaleString() : value.toFixed(3);
+        // tooltipMatrix, when given, adds a second figure in parentheses
+        // (e.g. the abundance heatmap colours by % of total but also shows
+        // the exact raw read count) so hovering gives both the
+        // depth-independent read and the underlying count without needing
+        // a separate view.
+        const secondaryText = tooltipMatrix ? ` (${tooltipMatrix[r][c].toLocaleString()}${tooltipUnit})` : '';
         title.textContent = `${label} × ${colLabels[c]}: ${valueText}${secondaryText}`;
         rect.appendChild(title);
         svg.appendChild(rect);

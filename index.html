@@ -49,7 +49,7 @@
       { "@type": "Question", "name": "Can I compare multiple samples?",
         "acceptedAnswer": { "@type": "Answer", "text": "Yes. Load a full run, assign samples to groups, and the overview dashboard, stacked composition chart, abundance heatmap, presence/absence matrix, diversity summary, Bray-Curtis/Jaccard similarity matrix, and a PCoA ordination plot all update to match — grouped, coloured, and recalculated live." } },
       { "@type": "Question", "name": "How does it handle read-count scaling across samples?",
-        "acceptedAnswer": { "@type": "Answer", "text": "The same way for every input format: parsing always keeps each sample's raw read counts as reported by the source tool, with no rarefaction or rescaling to a common depth at load time. Downstream, the stacked composition chart, the rank table's percent-of-total column, the diversity summary, and Bray-Curtis distance (similarity matrix and PCoA) all work from each sample's own relative proportions, so differing sequencing depth doesn't distort them. The abundance heatmap and the Jaccard distance/presence-absence matrix intentionally use raw read counts against a read-count threshold instead." } },
+        "acceptedAnswer": { "@type": "Answer", "text": "The same way for every input format: parsing always keeps each sample's raw read counts as reported by the source tool, with no rarefaction or rescaling to a common depth at load time. Downstream, the abundance heatmap's colour, the rank table's percent-of-total column, the diversity summary, and Bray-Curtis distance (similarity matrix and PCoA) all work from each sample's own relative proportions, so differing sequencing depth doesn't distort them. The stacked composition chart defaults to the same % view but has a raw-read-count display toggle, and the Jaccard distance/presence-absence matrix intentionally use raw read counts against a read-count threshold." } },
       { "@type": "Question", "name": "Can I export results for MicrobiomeAnalyst?",
         "acceptedAnswer": { "@type": "Answer", "text": "Yes. The MicrobiomeAnalyst export builds the abundance table, taxonomy mapping, and metadata files to their documented format exactly, reflecting exactly the samples, rank, and filters currently shown in the comparison view." } },
       { "@type": "Question", "name": "Can I export the diagrams?",
@@ -243,19 +243,20 @@ qiime tools export --input-path taxonomy.qza --output-path exported-taxonomy</co
     </p>
     <ul class="input-source-list">
       <li>
-        <strong>Relative proportions</strong> (depth-independent) — the stacked composition chart, the per-sample
-        rank table's "% of total" column, the diversity summary (richness/Shannon/Simpson), and Bray-Curtis
-        distance (feeding both the sample-similarity matrix and the PCoA ordination plot). Differing read totals
-        between samples don't distort any of these.
+        <strong>Relative proportions</strong> (depth-independent) — the abundance heatmap's colour, the stacked
+        composition chart in its default "% of sample" display, the per-sample rank table's "% of total" column,
+        the diversity summary (richness/Shannon/Simpson), and Bray-Curtis distance (feeding both the
+        sample-similarity matrix and the PCoA ordination plot). Differing read totals between samples don't
+        distort any of these.
       </li>
       <li>
-        <strong>Raw read counts</strong> (depth-sensitive, by design) — the abundance heatmap, so you can see
-        actual sequencing depth at a glance (a deeply-sequenced sample reads more intensely there even where its
-        relative composition is similar to a shallower one); and the Jaccard presence/absence distance and the
-        presence/absence matrix, both of which call a taxon "present" once it clears a raw-read-count threshold
-        you set, not a percentage. The abundance heatmap's hover tooltip shows both figures for each cell — the
-        raw read count the colour is based on, and that cell's % of the sample's total — so you get the
-        depth-independent read without leaving the heatmap.
+        <strong>Raw read counts</strong> (depth-sensitive, by design where used) — the stacked composition chart
+        has a "Read count" display toggle alongside its default "% of sample" view, so you can switch to seeing
+        actual bar heights vary with sequencing depth when that's what you want to compare; and the Jaccard
+        presence/absence distance and the presence/absence matrix, both of which call a taxon "present" once it
+        clears a raw-read-count threshold you set, not a percentage. The abundance heatmap's hover tooltip always
+        shows both figures for a cell — its % of that sample's total (what the colour is based on) and the raw
+        read count behind it — regardless of which display mode the composition chart is in.
       </li>
     </ul>
     <p>
@@ -280,13 +281,14 @@ qiime tools export --input-path taxonomy.qza --output-path exported-taxonomy</co
       Yes. The sunburst, Sankey diagram, heatmaps, stacked composition chart, and PCoA ordination plot each
       export as SVG (vector, edit it further) or PNG (raster, drop into a slide or report). The filtered rank
       table, the merged abundance matrix, and the diversity/similarity summaries all export as CSV, with the
-      current group assignment included as a column so the file is self-describing without this tool. Each CSV
-      carries the same counts as its on-screen view: the rank table export has <strong>both</strong> raw reads
-      and percent-of-total columns; the abundance matrix export is <strong>raw counts only</strong> (matching the
-      heatmap); the diversity summary is <strong>proportion-based</strong> (richness/Shannon/Simpson); and the
-      similarity/distance matrix export is the Bray-Curtis (proportion-based) or Jaccard (raw-count-threshold)
-      distance values themselves, not counts. The MicrobiomeAnalyst export is <strong>raw counts</strong>
-      throughout, since that's the format MicrobiomeAnalyst itself expects.
+      current group assignment included as a column so the file is self-describing without this tool. The rank
+      table export has <strong>both</strong> raw reads and percent-of-total columns; the abundance matrix export
+      is <strong>raw counts only</strong> — deliberately not the percentages the heatmap is now coloured from, so
+      the export still gives downstream tools the counts they typically expect; the diversity summary is
+      <strong>proportion-based</strong> (richness/Shannon/Simpson); and the similarity/distance matrix export is
+      the Bray-Curtis (proportion-based) or Jaccard (raw-count-threshold) distance values themselves, not counts.
+      The MicrobiomeAnalyst export is <strong>raw counts</strong> throughout, since that's the format
+      MicrobiomeAnalyst itself expects.
     </p>
 
     <h3>Is it free?</h3>
