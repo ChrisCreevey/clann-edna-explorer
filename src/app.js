@@ -1328,6 +1328,29 @@
     const section = el('div', { className: 'card overview-dashboard' });
     section.appendChild(el('h3', { text: 'Overview' }));
 
+    // Per-sample stats first — the group summary below aggregates these,
+    // but the individual numbers behind a mean/range are often exactly
+    // what you want to check (e.g. spotting the one sample dragging a
+    // group's classified % down).
+    section.appendChild(el('h4', { text: 'Per sample' }));
+    const perSampleTable = el('table', { className: 'overview-stats-table' });
+    const perSampleHead = el('tr', {}, ['Sample', 'Group', 'Total reads', 'Classified %'].map((h) => el('th', { text: h })));
+    perSampleTable.appendChild(el('thead', {}, [perSampleHead]));
+    const perSampleBody = el('tbody');
+    included.forEach((s) => {
+      const stat = computeSampleSummary(run.tree, s.id, { filters: currentFilters() });
+      perSampleBody.appendChild(
+        el('tr', {}, [
+          el('td', { text: s.id }),
+          el('td', { text: s.group || '—' }),
+          el('td', { text: stat.totalReads.toLocaleString() }),
+          el('td', { text: `${stat.classifiedPct.toFixed(1)}%` }),
+        ])
+      );
+    });
+    perSampleTable.appendChild(perSampleBody);
+    section.appendChild(perSampleTable);
+
     // Run-level stats, per group when >1 group has samples.
     const summary = summarizeGroups(run.samples, groupNames);
     const activeGroups = groupNames.filter((g) => summary.byGroup.get(g).length > 0);
@@ -1339,6 +1362,7 @@
       buckets.push({ label: 'Unassigned', ids: summary.unassigned });
     }
 
+    section.appendChild(el('h4', { text: 'Group summary' }));
     const statsTable = el('table', { className: 'overview-stats-table' });
     const headRow = el('tr', {}, ['Group', 'n', 'Total reads (mean, range)', 'Classified % (mean, range)'].map((h) => el('th', { text: h })));
     statsTable.appendChild(el('thead', {}, [headRow]));
