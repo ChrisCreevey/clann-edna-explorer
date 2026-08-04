@@ -253,7 +253,9 @@ qiime tools export --input-path taxonomy.qza --output-path exported-taxonomy</co
         actual sequencing depth at a glance (a deeply-sequenced sample reads more intensely there even where its
         relative composition is similar to a shallower one); and the Jaccard presence/absence distance and the
         presence/absence matrix, both of which call a taxon "present" once it clears a raw-read-count threshold
-        you set, not a percentage.
+        you set, not a percentage. The abundance heatmap's hover tooltip shows both figures for each cell — the
+        raw read count the colour is based on, and that cell's % of the sample's total — so you get the
+        depth-independent read without leaving the heatmap.
       </li>
     </ul>
     <p>

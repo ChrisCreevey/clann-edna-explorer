@@ -20,8 +20,13 @@
    * @param {import('./taxonomy-tree').TaxonomyTree} tree
    * @param {string[]} sampleIds
    * @param {string} rank
-   * @param {{valueField?: 'cladeReads'|'pctOfTotal', filters?: object}} [options]
-   * @returns {{taxa: Array<{taxid:number,name:string,total:number}>, sampleIds: string[], matrix: number[][]}}
+   * @param {{valueField?: 'cladeReads'|'pctOfTotal', secondaryValueField?: 'cladeReads'|'pctOfTotal', filters?: object}} [options]
+   *   `secondaryValueField`, if given, returns a second matrix in the same
+   *   taxa/sample order as `matrix` — e.g. the heatmap colours cells by raw
+   *   `cladeReads` (so sequencing depth is visible at a glance) but wants
+   *   `pctOfTotal` alongside for the hover tooltip, without a second,
+   *   independently-sorted call.
+   * @returns {{taxa: Array<{taxid:number,name:string,total:number}>, sampleIds: string[], matrix: number[][], secondaryMatrix?: number[][]}}
    */
   function buildAbundanceMatrix(tree, sampleIds, rank, options = {}) {
     const valueField = options.valueField || 'cladeReads';
@@ -37,10 +42,13 @@
     const taxids = [...taxonMeta.keys()];
     const rowIndex = new Map(taxids.map((id, i) => [id, i]));
     const matrix = taxids.map(() => sampleIds.map(() => 0));
+    const secondaryMatrix = options.secondaryValueField ? taxids.map(() => sampleIds.map(() => 0)) : null;
 
     perSampleRows.forEach((rows, colIdx) => {
       rows.forEach((r) => {
-        matrix[rowIndex.get(r.taxid)][colIdx] = r[valueField] || 0;
+        const i = rowIndex.get(r.taxid);
+        matrix[i][colIdx] = r[valueField] || 0;
+        if (secondaryMatrix) secondaryMatrix[i][colIdx] = r[options.secondaryValueField] || 0;
       });
     });
 
@@ -55,6 +63,7 @@
       taxa: order.map((i) => taxa[i]),
       sampleIds,
       matrix: order.map((i) => matrix[i]),
+      ...(secondaryMatrix ? { secondaryMatrix: order.map((i) => secondaryMatrix[i]) } : {}),
     };
   }
 

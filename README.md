@@ -149,7 +149,10 @@ own relative proportions, depending on what the view is for:
 - **Raw read counts** (depth-sensitive, by design) — the abundance
   heatmap, so actual sequencing depth is visible at a glance; and the
   Jaccard distance/presence-absence matrix, which call a taxon "present"
-  once it clears a raw-read-count threshold, not a percentage.
+  once it clears a raw-read-count threshold, not a percentage. The
+  heatmap's hover tooltip shows both the raw count a cell is coloured
+  from and that cell's % of the sample's total, so the depth-independent
+  read is available without leaving the heatmap.
 
 CSV exports carry the same counts as their on-screen view: the rank
 table export has both raw reads and percent-of-total columns; the

@@ -1658,11 +1658,15 @@
 
     // Abundance heatmap
     section.appendChild(el('h4', { text: 'Abundance heatmap' }));
-    const abundanceMatrix = buildAbundanceMatrix(run.tree, sampleIds, comparisonRank, { filters: currentFilters() });
+    const abundanceMatrix = buildAbundanceMatrix(run.tree, sampleIds, comparisonRank, {
+      filters: currentFilters(),
+      secondaryValueField: 'pctOfTotal',
+    });
     const cappedAbundance = {
       ...abundanceMatrix,
       taxa: abundanceMatrix.taxa.slice(0, heatmapMaxRows),
       matrix: abundanceMatrix.matrix.slice(0, heatmapMaxRows),
+      secondaryMatrix: abundanceMatrix.secondaryMatrix.slice(0, heatmapMaxRows),
     };
     const taxidByName = new Map(cappedAbundance.taxa.map((t) => [t.name, t.taxid]));
     const tagForRow = tagResolver ? (name) => tagResolver(name, taxidByName.get(name)) : null;
@@ -1678,6 +1682,12 @@
       rowLabels: cappedAbundance.taxa.map((t) => t.name),
       colLabels: sampleIds.map(sampleGroupLabelFn(included)),
       matrix: cappedAbundance.matrix,
+      // Cell colour stays raw-count-based (see the read-count-scaling FAQ
+      // for why), but the hover tooltip also reports % of that sample's
+      // total — depth-independent, and usually what you actually want
+      // when comparing a cell across samples of differing sequencing depth.
+      tooltipMatrix: cappedAbundance.secondaryMatrix,
+      tooltipUnit: '%',
       colGroupColors,
       isRowHighlighted: (name) => comparisonHighlightMatch(name, null),
       tagForRow,
