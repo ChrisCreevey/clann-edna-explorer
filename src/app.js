@@ -1684,6 +1684,12 @@
       colorForCategory,
     });
     section.appendChild(createExportButtons(() => heatmapHost, 'abundance-heatmap'));
+    section.appendChild(
+      el('p', {
+        className: 'hint',
+        text: `Exports every taxon at the "${comparisonRank}" rank selected above (not just the top ${heatmapMaxRows} shown), as raw read counts — the same counts the heatmap is coloured from, not percentages.`,
+      })
+    );
     const abundanceCsvBtn = el('button', { className: 'act', type: 'button', text: 'Export full matrix as CSV' });
     abundanceCsvBtn.addEventListener('click', () => {
       const groupBySampleId = Object.fromEntries(included.map((s) => [s.id, s.group || '']));
