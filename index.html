@@ -76,9 +76,8 @@
     <aside id="side">
       <h4>Load a run</h4>
       <div class="hint" id="load-empty-state">
-        Choose your Kraken2/Bracken output files (<code>.bracken</code> / <code>.breport</code>, any names) or a
-        Lineage TSV — select every file for a run at once. Files are identified by content, not filename or
-        extension.
+        Choose every file for a run at once — identified by content, not filename or extension. See
+        <a href="#supported-input-sources">supported input sources</a> below for what's accepted.
       </div>
       <ul id="file-ticklist" class="file-ticklist scroll-panel" style="display: none;"></ul>
       <button id="load-selected-btn" class="act" type="button" style="display: none;">Load selected</button>
@@ -110,10 +109,10 @@
         <div class="hero">
           <h1>Clann eDNA Explorer</h1>
           <div class="lead">
-            A free, browser-based explorer for Kraken2/Bracken eDNA metabarcoding results. Choose your
-            <code>.breport</code>/<code>.bracken</code> output files — any names, identified by content — to see
-            per-sample summaries, a Krona-style sunburst, a Pavian-style Sankey diagram, and, once a full run is
-            loaded, group-aware multi-sample comparison. Everything runs locally; nothing is uploaded to a server.
+            A free, browser-based explorer for eDNA metabarcoding and metagenomic classification results.
+            Load a run to see per-sample summaries, a Krona-style sunburst, a Pavian-style Sankey diagram, and,
+            once more than one sample is loaded, group-aware multi-sample comparison — composition, abundance,
+            diversity, and ordination. Everything runs locally; nothing is uploaded to a server.
           </div>
           <div class="exts">.bracken &middot; .breport &middot; Lineage TSV &middot; QIIME 2 &middot; generic CSV/TSV</div>
           <button id="emptyOpen" type="button">Choose files&hellip;</button>
@@ -137,7 +136,7 @@
       entirely in your browser.
     </p>
 
-    <h3>Supported input sources</h3>
+    <h3 id="supported-input-sources">Supported input sources</h3>
     <ul class="input-source-list">
       <li>
         <strong>Kraken2/Bracken</strong> — <code>.breport</code> (full taxonomic hierarchy) and/or
