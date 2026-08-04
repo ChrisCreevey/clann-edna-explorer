@@ -1334,28 +1334,49 @@
     const section = el('div', { className: 'card overview-dashboard' });
     section.appendChild(el('h3', { text: 'Overview' }));
 
+    // Per-rank resolution: % of a sample's total reads assigned to a taxon
+    // at this rank or deeper — distinct from Classified % (root-level,
+    // classified vs. unclassified), since a classified read can still stop
+    // resolving above any given rank. Filters (exclusion list, minimum
+    // abundance) apply the same way as everywhere else, via computeRankTable.
+    const rankColumns = unionAvailableRanks(included.map((s) => s.id));
+    const filters = currentFilters();
+    function rankResolutionPct(sampleId, totalReads) {
+      return rankColumns.map((r) => {
+        if (totalReads <= 0) return 0;
+        const resolved = computeRankTable(run.tree, sampleId, r, '', filters).reduce((s, row) => s + row.cladeReads, 0);
+        return (100 * resolved) / totalReads;
+      });
+    }
+    // Both tables gain a column per rank on top of their fixed columns —
+    // wrap in .table-wrap so they scroll horizontally rather than
+    // squeezing illegibly narrow on smaller windows.
+    const tableMinWidth = `${420 + rankColumns.length * 64}px`;
+
     // Per-sample stats first — the group summary below aggregates these,
-    // but the individual numbers behind a mean/range are often exactly
-    // what you want to check (e.g. spotting the one sample dragging a
-    // group's classified % down).
+    // but the individual numbers behind a mean are often exactly what you
+    // want to check (e.g. spotting the one sample dragging a group's
+    // classified % down, or the one that stops resolving at Family).
     section.appendChild(el('h4', { text: 'Per sample' }));
-    const perSampleTable = el('table', { className: 'overview-stats-table' });
-    const perSampleHead = el('tr', {}, ['Sample', 'Group', 'Total reads', 'Classified %'].map((h) => el('th', { text: h })));
+    const perSampleTable = el('table', { className: 'overview-stats-table', style: `min-width:${tableMinWidth}` });
+    const perSampleHead = el('tr', {}, ['Sample', 'Group', 'Total reads', 'Classified %', ...rankColumns.map((r) => `${r} %`)].map((h) => el('th', { text: h })));
     perSampleTable.appendChild(el('thead', {}, [perSampleHead]));
     const perSampleBody = el('tbody');
     included.forEach((s) => {
-      const stat = computeSampleSummary(run.tree, s.id, { filters: currentFilters() });
+      const stat = computeSampleSummary(run.tree, s.id, { filters });
+      const rankPcts = rankResolutionPct(s.id, stat.totalReads);
       perSampleBody.appendChild(
         el('tr', {}, [
           el('td', { text: s.id }),
           el('td', { text: s.group || '—' }),
           el('td', { text: stat.totalReads.toLocaleString() }),
           el('td', { text: `${stat.classifiedPct.toFixed(1)}%` }),
+          ...rankPcts.map((pct) => el('td', { text: `${pct.toFixed(1)}%` })),
         ])
       );
     });
     perSampleTable.appendChild(perSampleBody);
-    section.appendChild(perSampleTable);
+    section.appendChild(el('div', { className: 'table-wrap' }, [perSampleTable]));
 
     // Run-level stats, per group when >1 group has samples.
     const summary = summarizeGroups(run.samples, groupNames);
@@ -1368,31 +1389,35 @@
       buckets.push({ label: 'Unassigned', ids: summary.unassigned });
     }
 
+    // Mean-only throughout (no range) — the per-sample table above already
+    // shows every individual value, so the range is a glance away rather
+    // than duplicated here, which is what makes room for the rank columns.
     section.appendChild(el('h4', { text: 'Group summary' }));
-    const statsTable = el('table', { className: 'overview-stats-table' });
-    const headRow = el('tr', {}, ['Group', 'n', 'Total reads (mean, range)', 'Classified % (mean, range)'].map((h) => el('th', { text: h })));
+    const statsTable = el('table', { className: 'overview-stats-table', style: `min-width:${tableMinWidth}` });
+    const headRow = el('tr', {}, ['Group', 'n', 'Total reads (mean)', 'Classified % (mean)', ...rankColumns.map((r) => `${r} % (mean)`)].map((h) => el('th', { text: h })));
     statsTable.appendChild(el('thead', {}, [headRow]));
     const tbody = el('tbody');
+    const mean = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
     buckets.forEach((bucket) => {
-      const stats = bucket.ids
-        .map((id) => run.samples.get(id))
-        .filter((s) => s && s.kind !== 'generic')
-        .map((s) => computeSampleSummary(run.tree, s.id, { filters: currentFilters() }));
-      if (stats.length === 0) return;
+      const bucketSamples = bucket.ids.map((id) => run.samples.get(id)).filter((s) => s && s.kind !== 'generic');
+      if (bucketSamples.length === 0) return;
+      const stats = bucketSamples.map((s) => computeSampleSummary(run.tree, s.id, { filters }));
+      const rankPctsPerSample = bucketSamples.map((s, i) => rankResolutionPct(s.id, stats[i].totalReads));
+      const meanRankPcts = rankColumns.map((_, rIdx) => mean(rankPctsPerSample.map((pcts) => pcts[rIdx])));
       const totals = stats.map((s) => s.totalReads);
       const pcts = stats.map((s) => s.classifiedPct);
-      const mean = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
       tbody.appendChild(
         el('tr', {}, [
           el('td', { text: bucket.label }),
           el('td', { text: String(stats.length) }),
-          el('td', { text: `${Math.round(mean(totals)).toLocaleString()} (${Math.min(...totals).toLocaleString()}–${Math.max(...totals).toLocaleString()})` }),
-          el('td', { text: `${mean(pcts).toFixed(1)}% (${Math.min(...pcts).toFixed(1)}–${Math.max(...pcts).toFixed(1)}%)` }),
+          el('td', { text: Math.round(mean(totals)).toLocaleString() }),
+          el('td', { text: `${mean(pcts).toFixed(1)}%` }),
+          ...meanRankPcts.map((pct) => el('td', { text: `${pct.toFixed(1)}%` })),
         ])
       );
     });
     statsTable.appendChild(tbody);
-    section.appendChild(statsTable);
+    section.appendChild(el('div', { className: 'table-wrap' }, [statsTable]));
 
     // Diversity plot: metric selector + rank-aware per-group mean/range and per-sample points.
     const controlsRow = el('div', { className: 'overview-controls' });
