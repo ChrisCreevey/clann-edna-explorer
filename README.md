@@ -1,5 +1,8 @@
 # Clann eDNA Explorer
 
+# **Use it online here :** https://chriscreevey.github.io/clann-edna-explorer/
+
+
 A free, browser-based tool for exploring taxonomic classification results
 from eDNA metabarcoding and metagenomic studies. Load your Kraken2/Bracken
 output and get per-sample summaries, a Krona-style zoomable sunburst, a
@@ -11,8 +14,6 @@ summary, and a Bray-Curtis/Jaccard sample-similarity matrix.
 Nothing is uploaded anywhere. Every parsing step, every chart, and every
 export runs entirely in your browser — your data never leaves your
 computer.
-
-**Use it online:** https://chriscreevey.github.io/clann-edna-explorer/
 
 It's one of the [Clann suite](https://chriscreevey.github.io/) of
 browser-based bioinformatics tools, alongside
