@@ -746,15 +746,8 @@
       minAbundanceValue = Math.max(0, Number(valueInput.value) || 0);
       renderResults();
     });
-    const resetBtn = el('button', { className: 'act warn', type: 'button', text: 'Reset' });
-    resetBtn.addEventListener('click', () => {
-      minAbundanceValue = 0;
-      minAbundanceMode = 'pct';
-      renderResults();
-    });
     thresholdRow.appendChild(valueInput);
     thresholdRow.appendChild(modeSelect);
-    thresholdRow.appendChild(resetBtn);
     section.appendChild(thresholdRow);
 
     // Global taxon search — highlights, never filters, across every open view.
@@ -770,6 +763,19 @@
     });
     searchRow.appendChild(searchInput);
     section.appendChild(searchRow);
+
+    // Resets every control in this section, not just the threshold — the
+    // exclusion list and search box are easy to forget you've left set
+    // once you've moved on to something else.
+    const resetBtn = el('button', { className: 'act warn', type: 'button', text: 'Reset filters & search' });
+    resetBtn.addEventListener('click', () => {
+      exclusionListText = '';
+      minAbundanceValue = 0;
+      minAbundanceMode = 'pct';
+      globalSearchText = '';
+      renderResults();
+    });
+    section.appendChild(el('div', { className: 'diagram-export-row' }, [resetBtn]));
 
     return section;
   }
