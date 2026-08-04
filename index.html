@@ -42,6 +42,8 @@
         "acceptedAnswer": { "@type": "Answer", "text": "A Kraken2/Bracken .breport (full taxonomic hierarchy) and/or .bracken (leaf-rank re-estimated counts) file per sample, a Lineage TSV file — a hierarchy-aware format for tools that resolve their own taxonomy, such as Clann BLAST Explorer's eDNA Explorer sample export — or a QIIME 2 feature-table.tsv + taxonomy.tsv pair exported from a FeatureTable[Frequency]/FeatureData[Taxonomy] artifact. Files are identified by their content, not their name or extension, so Galaxy exports with generic filenames still work. A generic tab-delimited fallback parser handles output from other classifiers on a best-effort basis." } },
       { "@type": "Question", "name": "Can I load BLAST or DIAMOND results?",
         "acceptedAnswer": { "@type": "Answer", "text": "Yes. Resolve taxonomy for your BLAST/DIAMOND hits in Clann BLAST Explorer (its built-in taxonomy database resolves full lineage from a staxids value), then use its \"Download eDNA Explorer sample\" export to produce a Lineage TSV. Loading that file here gives it the same full rank views, sunburst, Sankey diagram, and multi-sample comparison as a native Kraken2/Bracken sample — not just a flat name list." } },
+      { "@type": "Question", "name": "What formats do sample metadata and taxon category tags use?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Both are optional CSV/TSV uploads. Sample metadata needs a header row: first column is the sample/barcode ID, every other column is an arbitrary field. Taxon category tags is a two-column taxon-name-or-taxid, category list with no header row. Example files are in the examples/ folder of the repository: sample-metadata.tsv and taxon-category-tags.tsv." } },
       { "@type": "Question", "name": "Is my data uploaded to a server?",
         "acceptedAnswer": { "@type": "Answer", "text": "No. Everything runs client-side in your browser — parsing, visualisation, and every export happen locally. Your classification results never leave your computer." } },
       { "@type": "Question", "name": "Can I compare multiple samples?",
@@ -119,20 +121,10 @@
     <h2>About Clann eDNA Explorer</h2>
     <p>
       <strong>Clann eDNA Explorer</strong> is a free, open-source tool for exploring taxonomic classification
-      results from eDNA metabarcoding and metagenomic studies. Choose your
-      <strong>Kraken2/Bracken</strong> output — <code>.breport</code> and/or <code>.bracken</code> files, any
-      names, identified by content rather than filename — and it builds per-sample summaries, a Krona-style
-      zoomable sunburst, a Pavian-style Sankey diagram, and, once a full run is loaded, group-aware multi-sample
-      comparison: a stacked composition chart, an abundance heatmap, a presence/absence matrix, a diversity
-      summary, a Bray-Curtis/Jaccard sample-similarity matrix, and a PCoA ordination plot.
-    </p>
-    <p>
-      Not running Kraken2/Bracken? A <strong>Lineage TSV</strong> file — full taxonomic lineage per row rather
-      than a flat name — gets exactly the same treatment: rank views, sunburst, Sankey, and full participation
-      in multi-sample comparison. <a href="https://chriscreevey.github.io/clann-blast-explorer/" target="_blank" rel="noopener">Clann BLAST Explorer</a>
-      produces this directly from BLAST/DIAMOND hits (its built-in taxonomy database resolves the full lineage)
-      via its "Download eDNA Explorer sample" export — useful for long-read/Nanopore metabarcoding runs BLASTed
-      or DIAMONDed against a database like NR.
+      results from eDNA metabarcoding and metagenomic studies. Load a run and it builds per-sample summaries, a
+      Krona-style zoomable sunburst, a Pavian-style Sankey diagram, and, once a full run is loaded, group-aware
+      multi-sample comparison: a stacked composition chart, an abundance heatmap, a presence/absence matrix, a
+      diversity summary, a Bray-Curtis/Jaccard sample-similarity matrix, and a PCoA ordination plot.
     </p>
     <p>
       A run can be filtered live by minimum abundance or a host/contaminant exclusion list, taxa can be searched
@@ -142,22 +134,38 @@
       formal statistical analysis downstream. Nothing is uploaded — parsing, visualisation, and every export run
       entirely in your browser.
     </p>
-    <h2>Frequently asked questions</h2>
 
-    <h3>What input files does it need?</h3>
+    <h3>Supported input sources</h3>
+    <ul class="input-source-list">
+      <li>
+        <strong>Kraken2/Bracken</strong> — <code>.breport</code> (full taxonomic hierarchy) and/or
+        <code>.bracken</code> (leaf-rank re-estimated counts) per sample, any filenames, identified by content.
+        Full rank views, sunburst, Sankey, and multi-sample comparison.
+      </li>
+      <li>
+        <strong>Lineage TSV</strong> — one row per resolved taxon path (name + taxid at every rank), for tools
+        that resolve their own taxonomy, e.g. BLAST/DIAMOND hits. Same full treatment as Kraken2/Bracken. Produced
+        directly by <a href="https://chriscreevey.github.io/clann-blast-explorer/" target="_blank" rel="noopener">Clann BLAST Explorer</a>'s
+        "Download eDNA Explorer sample" export — see the FAQ below for a worked example.
+      </li>
+      <li>
+        <strong>QIIME 2</strong> — a <code>feature-table.tsv</code> + <code>taxonomy.tsv</code> pair exported
+        from a <code>FeatureTable[Frequency]</code>/<code>FeatureData[Taxonomy]</code> artifact. Same full
+        treatment as the others — see the FAQ below for the export commands.
+      </li>
+      <li>
+        <strong>Generic tab-delimited fallback</strong> — best-effort support for other classifiers (Kaiju,
+        Centrifuge, MetaPhlAn, ...): a name column and an abundance column, with manual column mapping if
+        auto-detection can't confirm the shape. No taxonomic hierarchy, so it only feeds the per-sample table,
+        not the sunburst, Sankey, or comparison views.
+      </li>
+    </ul>
     <p>
-      A Kraken2/Bracken <code>.breport</code> (full taxonomic hierarchy) and/or <code>.bracken</code> (leaf-rank
-      re-estimated counts) file per sample, a <strong>Lineage TSV</strong> file — one row per resolved taxon
-      path, with a name and taxid at every rank rather than a flat name/count pair — or a
-      <strong>QIIME 2</strong> <code>feature-table.tsv</code> + <code>taxonomy.tsv</code> pair exported from a
-      <code>FeatureTable[Frequency]</code>/<code>FeatureData[Taxonomy]</code> artifact (see below). Files are
-      identified by their content, not their name or extension, so a Galaxy export with a generic filename still
-      loads correctly. Every one of these gets identical treatment: full rank views, sunburst, Sankey, and
-      multi-sample comparison. A generic tab-delimited fallback parser
-      handles output from other classifiers (Kaiju, Centrifuge, MetaPhlAn, ...) on a best-effort basis, with
-      manual column mapping if auto-detection can't confirm the shape — but without a taxonomic hierarchy, so it
-      only feeds the per-sample table, not the diagrams or comparison views.
+      Every format is identified by file <strong>content</strong>, not filename or extension, so a Galaxy export
+      with a generic name still loads correctly.
     </p>
+
+    <h2>Frequently asked questions</h2>
 
     <h3>Can I load BLAST or DIAMOND results?</h3>
     <p>
@@ -189,6 +197,18 @@ qiime tools export --input-path taxonomy.qza --output-path exported-taxonomy</co
       there's no separate sample-name field for these two rows. Features with no match in
       <code>taxonomy.tsv</code>, or an unresolved taxon string (e.g. <code>Unassigned</code>), count as
       unclassified reads for that sample rather than being dropped.
+    </p>
+
+    <h3>What formats do sample metadata and taxon category tags use?</h3>
+    <p>
+      Both are optional CSV/TSV uploads, separate from the run itself, and both are identified by content like
+      everything else. <strong>Sample metadata</strong> needs a header row: first column is the sample/barcode
+      ID, every other column is an arbitrary field you can use to label samples or pre-populate groups — see
+      <a href="examples/sample-metadata.tsv" target="_blank" rel="noopener">examples/sample-metadata.tsv</a>.
+      <strong>Taxon category tags</strong> is a two-column taxon-name-or-taxid, category list with
+      <em>no header row</em> — see
+      <a href="examples/taxon-category-tags.tsv" target="_blank" rel="noopener">examples/taxon-category-tags.tsv</a>.
+      Open either in a spreadsheet app to build your own from a template.
     </p>
 
     <h3>Is my data uploaded to a server?</h3>

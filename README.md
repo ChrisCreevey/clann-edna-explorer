@@ -43,9 +43,13 @@ and [Clann Pangenome Explorer](https://chriscreevey.github.io/clann-pangenome-ex
 - **Taxon tagging** — flag taxa of interest (pathogens, indicator
   species, invasive species, …) by uploading a taxid/name list and/or
   typing keyword rules; tags are highlighted consistently across every
-  table and diagram.
+  table and diagram. Two-column `taxon-or-taxid, category` list, no
+  header row — see
+  [`examples/taxon-category-tags.tsv`](examples/taxon-category-tags.tsv).
 - **Sample metadata** — join a CSV/TSV of per-sample metadata by ID, and
   optionally pre-populate group assignments from one of its columns.
+  First column is the sample/barcode ID, header row required — see
+  [`examples/sample-metadata.tsv`](examples/sample-metadata.tsv).
 - **Exports** — every diagram exports as SVG (vector) or PNG (raster);
   the filtered table, the merged abundance matrix, and the diversity/
   similarity summaries export as CSV; and the whole comparison exports

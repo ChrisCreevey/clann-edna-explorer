@@ -579,6 +579,13 @@
         text: 'Upload a CSV/TSV: first column is the sample/barcode ID, any further columns are metadata fields. Matches are joined by exact ID — a manual group assignment in Sample groups always takes precedence over pre-populating from a column here.',
       })
     );
+    {
+      const exampleHint = el('p', { className: 'hint' });
+      exampleHint.appendChild(document.createTextNode('Not sure of the format? See '));
+      exampleHint.appendChild(el('a', { href: 'examples/sample-metadata.tsv', target: '_blank', rel: 'noopener', text: 'examples/sample-metadata.tsv' }));
+      exampleHint.appendChild(document.createTextNode('.'));
+      container.appendChild(exampleHint);
+    }
 
     // No `accept` filter: this app identifies files by content, not
     // extension (see the folder-loader.js note) — a Galaxy-exported
@@ -797,6 +804,14 @@
     uploadTagListBtn.addEventListener('click', () => fileInput.click());
     section.appendChild(uploadTagListBtn);
     section.appendChild(fileInput);
+
+    {
+      const exampleHint = el('p', { className: 'hint' });
+      exampleHint.appendChild(document.createTextNode('Not sure of the format? See '));
+      exampleHint.appendChild(el('a', { href: 'examples/taxon-category-tags.tsv', target: '_blank', rel: 'noopener', text: 'examples/taxon-category-tags.tsv' }));
+      exampleHint.appendChild(document.createTextNode(' (no header row — each line is taxon/taxid, category).'));
+      section.appendChild(exampleHint);
+    }
 
     section.appendChild(el('p', { className: 'hint', text: 'Or type keyword rules, one per line: keyword => category' }));
     const keywordInput = el('textarea', {
