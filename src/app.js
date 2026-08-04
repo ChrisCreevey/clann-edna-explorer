@@ -679,19 +679,44 @@
     section.appendChild(
       el('p', {
         className: 'hint',
-        text: 'Exclude known host/contaminant taxa (exact name or taxid, comma or newline separated) — removed from every view and every calculation, with the rest renormalized to 100%.',
+        text: 'Exclude known host/contaminant taxa (exact name or taxid, comma or newline separated) — removed from every view and every calculation, with the rest renormalized to 100%. Click "Apply exclusions" to recalculate.',
       })
     );
+    const exclusionRow = el('div', { className: 'filter-exclusion-row' });
     const exclusionInput = el('textarea', {
       id: 'exclusion-list-input',
       rows: '2',
       placeholder: 'e.g. Homo sapiens, Bos taurus',
     });
     exclusionInput.value = exclusionListText;
-    focusPreservingInput(exclusionInput, 'exclusion-list-input', (v) => {
-      exclusionListText = v;
+    // Deliberately not auto-applied on every keystroke: excluding a taxon
+    // recomputes and redraws every chart, which is disruptive while the
+    // user is still mid-edit. Committing happens on explicit Apply instead.
+    const applyExclusionsBtn = el('button', { className: 'act', type: 'button', text: 'Apply exclusions' });
+    applyExclusionsBtn.disabled = true;
+    exclusionInput.addEventListener('input', () => {
+      applyExclusionsBtn.disabled = exclusionInput.value === exclusionListText;
     });
-    section.appendChild(exclusionInput);
+    const commitExclusions = () => {
+      const cursorPos = exclusionInput.selectionStart;
+      exclusionListText = exclusionInput.value;
+      renderResults();
+      const restored = document.getElementById('exclusion-list-input');
+      if (restored) {
+        restored.focus();
+        restored.setSelectionRange(cursorPos, cursorPos);
+      }
+    };
+    applyExclusionsBtn.addEventListener('click', commitExclusions);
+    exclusionInput.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey)) {
+        ev.preventDefault();
+        commitExclusions();
+      }
+    });
+    exclusionRow.appendChild(exclusionInput);
+    exclusionRow.appendChild(applyExclusionsBtn);
+    section.appendChild(exclusionRow);
 
     // Minimum abundance threshold
     const thresholdRow = el('div', { className: 'filter-threshold-row' });

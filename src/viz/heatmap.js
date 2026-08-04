@@ -52,7 +52,7 @@
       colGroupColors = null,
       cellWidth = 28,
       cellHeight = 18,
-      labelWidth = 160,
+      labelWidth: labelWidthOption,
       showValues = false,
       isRowHighlighted = null,
       tagForRow = null,
@@ -69,14 +69,24 @@
     }));
     if (!Number.isFinite(min)) { min = 0; max = 0; }
 
+    // Font is 10px; ~6px/char is a safe monospace-ish upper bound for
+    // proportional text at this size, used to size margins from the
+    // actual label text so long "sample (group)" labels aren't clipped.
+    const CHAR_WIDTH = 6;
+    const longestRowLabelLen = rowLabels.reduce((max, l) => Math.max(max, l.length), 0);
+    const labelWidth = labelWidthOption ?? Math.max(60, longestRowLabelLen * CHAR_WIDTH + 16);
+
     const groupStripHeight = colGroupColors ? 8 : 0;
-    const headerHeight = 90; // rotated column labels
     // The rightmost column's rotated label extends further right than the
     // grid itself (rotate(-60) around the top of the last column), so pad
     // the canvas width by the longest label's projected horizontal extent
-    // to keep it from being clipped at the top-right edge.
+    // to keep it from being clipped at the top-right edge. The same
+    // rotated extent, projected vertically, sizes the header height so
+    // long labels aren't clipped at the top either.
     const longestColLabelLen = colLabels.reduce((max, l) => Math.max(max, l.length), 0);
-    const rightPad = Math.ceil(longestColLabelLen * 10 * Math.cos((60 * Math.PI) / 180)) + 8;
+    const rotatedLabelLen = longestColLabelLen * CHAR_WIDTH;
+    const rightPad = Math.ceil(rotatedLabelLen * Math.cos((60 * Math.PI) / 180)) + 8;
+    const headerHeight = Math.max(50, Math.ceil(rotatedLabelLen * Math.sin((60 * Math.PI) / 180)) + 12);
     const width = labelWidth + colLabels.length * cellWidth + rightPad;
     const height = headerHeight + groupStripHeight + rowLabels.length * cellHeight + 4;
 

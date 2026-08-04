@@ -24,8 +24,18 @@
     const barWidth = Math.min(60, (width - barGap * (data.series.length + 1)) / data.series.length);
     const chartTop = 10;
     const chartHeight = options.chartHeight ?? 280;
-    const sampleLabelHeight = 90; // rotated sample labels below the bars
     const labelFn = options.sampleLabels || ((id) => id);
+    // Font is 10px; ~6px/char sizes the rotated (-60deg) label's vertical
+    // extent from the actual "sample (group)" text so long group names
+    // don't run into the legend below them.
+    const CHAR_WIDTH = 6;
+    const longestSampleLabelLen = data.series.reduce(
+      (max, s) => Math.max(max, labelFn(s.sampleId).length), 0,
+    );
+    const sampleLabelHeight = Math.max(
+      50,
+      Math.ceil(longestSampleLabelLen * CHAR_WIDTH * Math.sin((60 * Math.PI) / 180)) + 16,
+    );
     const isTaxonHighlighted = options.isTaxonHighlighted || null;
     const tagForTaxon = options.tagForTaxon || null;
     const colorForCategory = options.colorForCategory || null;
