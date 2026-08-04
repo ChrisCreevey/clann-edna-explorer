@@ -130,6 +130,43 @@ can set the column indices manually before loading. This fallback is
 meant for other classifiers' plain-table output (e.g. a Kaiju summary or
 a MetaPhlAn abundance table) — see below for planned native support.
 
+## Read-count scaling
+
+Handled the same way regardless of input format: parsing always keeps
+each sample's **raw read counts** as reported by the source tool
+(Kraken2/Bracken's own counts, a Lineage TSV's `count` column, a QIIME 2
+feature table's cell values) — nothing is rarefied or rescaled to a
+common depth at load time. There's no rarefaction, CSS, or TMM-style
+formal normalization anywhere in the tool.
+
+Downstream, each view then works from either raw counts or each sample's
+own relative proportions, depending on what the view is for:
+
+- **Relative proportions** (depth-independent) — the stacked composition
+  chart, the per-sample rank table's "% of total" column, the diversity
+  summary (richness/Shannon/Simpson), and Bray-Curtis distance (feeding
+  both the sample-similarity matrix and the PCoA ordination plot).
+- **Raw read counts** (depth-sensitive, by design) — the abundance
+  heatmap, so actual sequencing depth is visible at a glance; and the
+  Jaccard distance/presence-absence matrix, which call a taxon "present"
+  once it clears a raw-read-count threshold, not a percentage.
+
+CSV exports carry the same counts as their on-screen view: the rank
+table export has both raw reads and percent-of-total columns; the
+merged abundance matrix export is raw counts only (matching the
+heatmap); the diversity summary export is proportion-based; the
+similarity/distance matrix export is the distance values themselves
+(Bray-Curtis proportion-based, Jaccard raw-count-threshold), not counts;
+and the MicrobiomeAnalyst export is raw counts throughout, matching what
+that tool expects.
+
+One provenance subtlety when both `.breport` and `.bracken` are loaded
+for a sample: species-rank counts become Bracken's statistically
+re-estimated numbers, but genus-rank-and-above counts still come from
+Kraken's original `.breport` clade assignments and aren't re-summed from
+the corrected species values — so a genus total won't exactly equal the
+sum of its (Bracken-corrected) species children in that case.
+
 ## Planned: native support for other classifiers
 
 Right now, anything other than Kraken2/Bracken/QIIME 2 goes through the

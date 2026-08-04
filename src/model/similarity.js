@@ -43,7 +43,15 @@
    */
   function computeDistanceMatrix(tree, sampleIds, rank, metric, options = {}) {
     const minAbundance = options.minAbundance ?? 1;
-    const { matrix: abundance, sampleIds: cols } = buildAbundanceMatrix(tree, sampleIds, rank, { filters: options.filters });
+    // Bray-Curtis is abundance-weighted, so it must run on each sample's
+    // relative proportions (pctOfTotal) rather than raw read counts —
+    // otherwise it's confounded by differing sequencing depth between
+    // samples rather than measuring compositional (dis)similarity. Jaccard
+    // is a presence/absence call against `minAbundance`, a read-count
+    // threshold shared with the presence/absence matrix elsewhere in the
+    // app, so it stays on raw counts.
+    const valueField = metric === 'jaccard' ? 'cladeReads' : 'pctOfTotal';
+    const { matrix: abundance, sampleIds: cols } = buildAbundanceMatrix(tree, sampleIds, rank, { valueField, filters: options.filters });
 
     const columns = cols.map((_, colIdx) => abundance.map((row) => row[colIdx]));
     const n = columns.length;

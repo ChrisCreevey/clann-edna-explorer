@@ -48,6 +48,8 @@
         "acceptedAnswer": { "@type": "Answer", "text": "No. Everything runs client-side in your browser — parsing, visualisation, and every export happen locally. Your classification results never leave your computer." } },
       { "@type": "Question", "name": "Can I compare multiple samples?",
         "acceptedAnswer": { "@type": "Answer", "text": "Yes. Load a full run, assign samples to groups, and the overview dashboard, stacked composition chart, abundance heatmap, presence/absence matrix, diversity summary, Bray-Curtis/Jaccard similarity matrix, and a PCoA ordination plot all update to match — grouped, coloured, and recalculated live." } },
+      { "@type": "Question", "name": "How does it handle read-count scaling across samples?",
+        "acceptedAnswer": { "@type": "Answer", "text": "The same way for every input format: parsing always keeps each sample's raw read counts as reported by the source tool, with no rarefaction or rescaling to a common depth at load time. Downstream, the stacked composition chart, the rank table's percent-of-total column, the diversity summary, and Bray-Curtis distance (similarity matrix and PCoA) all work from each sample's own relative proportions, so differing sequencing depth doesn't distort them. The abundance heatmap and the Jaccard distance/presence-absence matrix intentionally use raw read counts against a read-count threshold instead." } },
       { "@type": "Question", "name": "Can I export results for MicrobiomeAnalyst?",
         "acceptedAnswer": { "@type": "Answer", "text": "Yes. The MicrobiomeAnalyst export builds the abundance table, taxonomy mapping, and metadata files to their documented format exactly, reflecting exactly the samples, rank, and filters currently shown in the comparison view." } },
       { "@type": "Question", "name": "Can I export the diagrams?",
@@ -226,14 +228,41 @@ qiime tools export --input-path taxonomy.qza --output-path exported-taxonomy</co
       summary, and sample-similarity matrix all recalculate live to match — grouped, coloured, and ordered by
       group throughout. The overview also includes a PCoA ordination plot (on Bray-Curtis distance), where each
       sample's point shape reflects its group and its colour can be switched, via a dropdown, to any uploaded
-      metadata field instead. Samples rarely share the same sequencing depth, so scaling matters: the stacked
-      composition chart and diversity summary work from each sample's relative proportions, and Bray-Curtis
-      distance — which feeds both the similarity matrix and the ordination plot — is likewise computed on
-      proportions, so differing read totals between samples don't distort those views. The abundance heatmap is
-      the one exception: it's coloured from raw read counts by design (so you can see actual sequencing depth at
-      a glance), so a deeply-sequenced sample will read more intensely there even where relative composition is
-      similar — switch to the per-sample rank table's "% of total" column, or the presence/absence matrix, for a
-      depth-independent read.
+      metadata field instead. Samples rarely share the same sequencing depth — see "How does it handle read-count
+      scaling across samples?" below for exactly which views are depth-independent and which show raw counts by
+      design.
+    </p>
+
+    <h3>How does it handle read-count scaling across samples?</h3>
+    <p>
+      The same way for every input format: parsing always keeps each sample's <strong>raw read counts</strong> as
+      reported by the source tool (Kraken2/Bracken's own counts, a Lineage TSV's <code>count</code> column, a
+      QIIME 2 feature table's cell values) — nothing is rarefied or rescaled to a common depth at load time.
+      Downstream, each view then chooses either raw counts or that sample's own relative proportions, depending
+      on what the view is for:
+    </p>
+    <ul class="input-source-list">
+      <li>
+        <strong>Relative proportions</strong> (depth-independent) — the stacked composition chart, the per-sample
+        rank table's "% of total" column, the diversity summary (richness/Shannon/Simpson), and Bray-Curtis
+        distance (feeding both the sample-similarity matrix and the PCoA ordination plot). Differing read totals
+        between samples don't distort any of these.
+      </li>
+      <li>
+        <strong>Raw read counts</strong> (depth-sensitive, by design) — the abundance heatmap, so you can see
+        actual sequencing depth at a glance (a deeply-sequenced sample reads more intensely there even where its
+        relative composition is similar to a shallower one); and the Jaccard presence/absence distance and the
+        presence/absence matrix, both of which call a taxon "present" once it clears a raw-read-count threshold
+        you set, not a percentage.
+      </li>
+    </ul>
+    <p>
+      There's no rarefaction, CSS, or TMM-style formal normalization anywhere in the tool — just raw counts and
+      same-sample relative proportions, as above. One provenance subtlety if you load matching
+      <code>.breport</code> + <code>.bracken</code> pairs: species-rank counts become Bracken's statistically
+      re-estimated numbers, but genus-rank-and-above counts still come from Kraken's original <code>.breport</code>
+      clade assignments and aren't re-summed from the corrected species values — so a genus total won't exactly
+      equal the sum of its (Bracken-corrected) species children in that case.
     </p>
 
     <h3>Can I export results for MicrobiomeAnalyst?</h3>
@@ -249,7 +278,13 @@ qiime tools export --input-path taxonomy.qza --output-path exported-taxonomy</co
       Yes. The sunburst, Sankey diagram, heatmaps, stacked composition chart, and PCoA ordination plot each
       export as SVG (vector, edit it further) or PNG (raster, drop into a slide or report). The filtered rank
       table, the merged abundance matrix, and the diversity/similarity summaries all export as CSV, with the
-      current group assignment included as a column so the file is self-describing without this tool.
+      current group assignment included as a column so the file is self-describing without this tool. Each CSV
+      carries the same counts as its on-screen view: the rank table export has <strong>both</strong> raw reads
+      and percent-of-total columns; the abundance matrix export is <strong>raw counts only</strong> (matching the
+      heatmap); the diversity summary is <strong>proportion-based</strong> (richness/Shannon/Simpson); and the
+      similarity/distance matrix export is the Bray-Curtis (proportion-based) or Jaccard (raw-count-threshold)
+      distance values themselves, not counts. The MicrobiomeAnalyst export is <strong>raw counts</strong>
+      throughout, since that's the format MicrobiomeAnalyst itself expects.
     </p>
 
     <h3>Is it free?</h3>
