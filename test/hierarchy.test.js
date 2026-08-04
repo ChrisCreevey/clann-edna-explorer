@@ -184,4 +184,32 @@ test('a node below the minimum-abundance threshold is dropped along with its des
   assert.strictEqual(find(filtered, 1790162), null);
 });
 
+test('excluding a clade reduces every ancestor\'s cladeReads too, so children still sum to their parent (no sunburst gap)', () => {
+  const tree = new TaxonomyTree();
+  parseBreport(read('barcode39.breport'), tree, 'barcode39');
+  parseBracken(read('barcode39.bracken'), tree, 'barcode39');
+
+  const unfiltered = buildHierarchyTree(tree, 'barcode39');
+  const filtered = buildHierarchyTree(tree, 'barcode39', { exclusionTerms: ['Chordata'] });
+
+  // The excluded clade's own stored cladeReads (baked in at parse time)
+  // must be subtracted from the root, not just dropped from the children
+  // list — otherwise the root's angle span (still sized for the old,
+  // larger total) leaves a gap where the excluded wedge used to be.
+  assert.ok(filtered.cladeReads < unfiltered.cladeReads);
+  const childSum = filtered.children.reduce((s, c) => s + c.cladeReads, 0);
+  assert.strictEqual(childSum, filtered.cladeReads);
+
+  function find(node, name) {
+    if (node.name === name) return node;
+    for (const c of node.children) {
+      const found = find(c, name);
+      if (found) return found;
+    }
+    return null;
+  }
+  assert.strictEqual(find(filtered, 'Chordata'), null);
+  assert.strictEqual(find(filtered, 'Xenopus lenduensis'), null); // a descendant of the excluded clade
+});
+
 report();

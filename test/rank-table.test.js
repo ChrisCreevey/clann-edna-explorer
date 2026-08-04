@@ -106,6 +106,23 @@ test('global minimum-abundance filter narrows the table without renormalizing', 
   assert.ok(filtered.every((r) => r.pctOfTotal >= 1));
 });
 
+test('excluding a higher-rank taxon (e.g. a phylum) drops its whole clade from a deeper rank table too', () => {
+  const tree = new TaxonomyTree();
+  parseBreport(read('barcode39.breport'), tree, 'barcode39');
+  const unfiltered = computeRankTable(tree, 'barcode39', 'S');
+  const filtered = computeRankTable(tree, 'barcode39', 'S', '', { exclusionTerms: ['Chordata'] });
+
+  // Excluding a phylum-rank name can't exact-match any species-rank row's
+  // own name, so this only works if exclusion is ancestor-aware — a naive
+  // same-rank-only name match (the original bug) would leave every
+  // chordate species row untouched here.
+  assert.ok(filtered.length < unfiltered.length);
+  const unfilteredTotal = unfiltered.reduce((s, r) => s + r.cladeReads, 0);
+  const filteredTotal = filtered.reduce((s, r) => s + r.cladeReads, 0);
+  assert.ok(filteredTotal < unfilteredTotal);
+  assert.strictEqual(filtered.find((r) => r.name === 'Xenopus lenduensis'), undefined);
+});
+
 test('global filters and local search term compose (filters first, then local search narrows further)', () => {
   const tree = new TaxonomyTree();
   parseBreport(read('barcode39.breport'), tree, 'barcode39');

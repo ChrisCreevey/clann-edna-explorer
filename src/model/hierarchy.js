@@ -38,6 +38,30 @@ function buildHierarchyTree(tree, sampleId, filters = null) {
   const byIndex = new Map(); // treeIndex -> hierarchy node
   const pruned = computeTreePruneMask(tree, sampleId, filters);
 
+  // cladeReads is baked in at parse time — a node's own stored total
+  // already includes every descendant's reads, so pruning a clade doesn't
+  // retroactively shrink its ancestors' stored totals. Left uncorrected,
+  // the sunburst's angle-by-cladeReads-share layout (child angle = share
+  // of parent.cladeReads — see src/viz/sunburst.js) would leave a gap
+  // where the excluded wedge used to be, since the remaining children's
+  // angles would no longer sum to their parent's: the parent's angle span
+  // still reflects the old, larger total. `extra` is the same
+  // clade-subtraction correction computeExcludedClassifiedReads applies
+  // at the root (src/model/summary.js) and rankResolutionPct applies per
+  // rank (src/app.js), generalized here to every ancestor of every
+  // excluded clade, so a node's cladeReads always equals what's actually
+  // left under it in the filtered tree.
+  const extra = new Float64Array(tree.size);
+  for (let i = 0; i < tree.size; i++) {
+    if (!pruned[i]) continue;
+    const parentIdx = tree.parentIndex[i];
+    if (parentIdx !== -1 && pruned[parentIdx]) continue; // not the topmost node of this excluded clade
+    const counts = tree.perSample[i].get(sampleId);
+    const reads = counts ? counts.cladeReads || 0 : 0;
+    if (reads === 0) continue;
+    for (let p = parentIdx; p !== -1; p = tree.parentIndex[p]) extra[p] += reads;
+  }
+
   for (let i = 0; i < tree.size; i++) {
     if (pruned[i]) continue;
     if (tree.rankSub[i] !== 0) continue; // skip no-rank filler clades
@@ -48,7 +72,7 @@ function buildHierarchyTree(tree, sampleId, filters = null) {
       name: tree.name[i],
       rank: tree.rankLetter[i],
       depth: tree.depth[i],
-      cladeReads: counts.cladeReads || 0,
+      cladeReads: Math.max(0, (counts.cladeReads || 0) - extra[i]),
       directReads: counts.directReads || 0,
       pctOfTotal: counts.pctOfTotal || 0,
       children: [],

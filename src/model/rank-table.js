@@ -4,7 +4,7 @@
 // Rank-by-rank breakdown table and Top-N bucketing for a single tree-backed
 // sample, plus the flat-row equivalent for generic-format samples.
 
-const { applyFilters } = typeof module !== 'undefined' && module.exports
+const { applyFilters, computeTreePruneMask } = typeof module !== 'undefined' && module.exports
   ? require('./filters')
   : window.ClannEDNA.filters;
 
@@ -44,14 +44,28 @@ function computeAvailableRanks(tree, sampleId) {
  * function and must see the same filtered/renormalized rows regardless of
  * what's typed into any one table's own search box.
  *
+ * The exclusion list is matched against the *whole ancestor chain*, not
+ * just the rank being queried — excluding "Chordata" (a phylum) must drop
+ * every chordate species from the species-rank table too, not just an
+ * exact "Chordata" row at the phylum rank (which is all a same-rank-only
+ * name match would ever catch). computeTreePruneMask already does this
+ * ancestor-aware matching for the sunburst/Sankey and the overview's
+ * excluded-read totals; reusing it here keeps every view's exclusion
+ * semantics consistent. Minimum-abundance is deliberately left out of the
+ * mask (only exclusionTerms is passed through) — it's applied afterward,
+ * via applyFilters, as the existing display-only filter that hides a row
+ * without pruning its subtree or affecting other rows' renormalization.
+ *
  * @param {{minAbundance?: {mode: 'pct'|'reads', value: number}, exclusionTerms?: string[]}} [filters]
  */
 function computeRankTable(tree, sampleId, rankLetter, searchTerm = '', filters = null) {
   if (NON_BREAKDOWN_RANKS.has(rankLetter)) return [];
   const term = searchTerm.trim().toLowerCase();
+  const pruned = computeTreePruneMask(tree, sampleId, { exclusionTerms: filters && filters.exclusionTerms });
   const rows = [];
   for (let i = 0; i < tree.size; i++) {
     if (tree.rankLetter[i] !== rankLetter || tree.rankSub[i] !== 0) continue;
+    if (pruned[i]) continue;
     const counts = tree.perSample[i].get(sampleId);
     if (!counts) continue;
     rows.push({
