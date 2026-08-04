@@ -24,7 +24,7 @@
   const { renderHeatmapSVG, sequentialColor, binaryColor } = window.ClannEDNA.heatmap;
   const { renderStackedBarSVG } = window.ClannEDNA.stackedBar;
   const { renderOrdinationSVG } = window.ClannEDNA.ordinationPlot;
-  const { parseExclusionList, matchesSearch } = window.ClannEDNA.filters;
+  const { parseExclusionList, matchesSearch, computeTreePruneMask } = window.ClannEDNA.filters;
   const { buildMicrobiomeAnalystExport } = window.ClannEDNA.microbiomeAnalystExport;
   const { parseSampleMetadata, matchSummary: metadataMatchSummary } = window.ClannEDNA.sampleMetadata;
   const { parseTaxonTagList, parseKeywordRules, resolveTag } = window.ClannEDNA.tags;
@@ -1337,16 +1337,48 @@
     // Per-rank resolution: % of a sample's total reads assigned to a taxon
     // at this rank or deeper — distinct from Classified % (root-level,
     // classified vs. unclassified), since a classified read can still stop
-    // resolving above any given rank. Filters (exclusion list, minimum
-    // abundance) apply the same way as everywhere else, via computeRankTable.
+    // resolving above any given rank.
+    //
+    // cladeReads is baked in at parse time (each node's own stored total
+    // already includes every descendant's reads), so excluding a deep
+    // clade doesn't retroactively shrink its ancestors' stored cladeReads
+    // — an ancestor rank's raw sum still counts the excluded clade's reads
+    // even though totalReads (via computeExcludedClassifiedReads) has
+    // already subtracted them, which is what pushed these percentages
+    // over 100%. `extra[i]` below is exactly the correction
+    // computeExcludedClassifiedReads applies at the root, generalized to
+    // every ancestor of every excluded clade: the total reads of each
+    // topmost-pruned clade, propagated up through every ancestor's own
+    // running total. Minimum-abundance is deliberately excluded from the
+    // prune mask, matching totalReads/Classified %'s own exclusion-only
+    // semantics (display filter, not a read-count reduction).
     const rankColumns = unionAvailableRanks(included.map((s) => s.id));
     const filters = currentFilters();
     function rankResolutionPct(sampleId, totalReads) {
-      return rankColumns.map((r) => {
-        if (totalReads <= 0) return 0;
-        const resolved = computeRankTable(run.tree, sampleId, r, '', filters).reduce((s, row) => s + row.cladeReads, 0);
-        return (100 * resolved) / totalReads;
-      });
+      if (totalReads <= 0) return rankColumns.map(() => 0);
+      const tree = run.tree;
+      const pruned = computeTreePruneMask(tree, sampleId, { exclusionTerms: filters.exclusionTerms });
+      const extra = new Float64Array(tree.size);
+      for (let i = 0; i < tree.size; i++) {
+        if (!pruned[i]) continue;
+        const parentIdx = tree.parentIndex[i];
+        if (parentIdx !== -1 && pruned[parentIdx]) continue; // not the topmost node of this excluded clade
+        const counts = tree.perSample[i].get(sampleId);
+        const reads = counts ? counts.cladeReads || 0 : 0;
+        if (reads === 0) continue;
+        for (let p = parentIdx; p !== -1; p = tree.parentIndex[p]) extra[p] += reads;
+      }
+      const rankIndex = new Map(rankColumns.map((r, idx) => [r, idx]));
+      const resolvedByRank = rankColumns.map(() => 0);
+      for (let i = 0; i < tree.size; i++) {
+        if (pruned[i] || tree.rankSub[i] !== 0) continue;
+        const idx = rankIndex.get(tree.rankLetter[i]);
+        if (idx === undefined) continue;
+        const counts = tree.perSample[i].get(sampleId);
+        if (!counts) continue;
+        resolvedByRank[idx] += Math.max(0, (counts.cladeReads || 0) - extra[i]);
+      }
+      return rankColumns.map((_, idx) => (100 * resolvedByRank[idx]) / totalReads);
     }
     // Both tables gain a column per rank on top of their fixed columns —
     // wrap in .table-wrap so they scroll horizontally rather than
