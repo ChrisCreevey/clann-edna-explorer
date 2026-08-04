@@ -1983,4 +1983,16 @@
     root.dataset.theme = next;
     localStorage.setItem(THEME_KEY, next);
   });
+
+  // ---- Confirm before leaving once a run is loaded ---------------------
+  // Nothing is persisted anywhere (by design — see the About section), so
+  // a reload or back-navigation silently wipes every loaded sample, group
+  // assignment, filter, and tag. Only warn once there's actually something
+  // to lose; setting/clearing returnValue on every render would be wasted
+  // work and the browser only needs it set at unload time anyway.
+  window.addEventListener('beforeunload', (e) => {
+    if (run.samples.size === 0) return;
+    e.preventDefault();
+    e.returnValue = '';
+  });
 })();
