@@ -443,8 +443,7 @@ dominate at each rank and the relative proportions flowing between ranks.
 
 ```{r sunburst-r-data}
 breport39 <- parse_breport(file.path(fixtures_dir, "barcode39.breport"))
-# Build parent-child edges directly from the depth-indentation for a plotly
-# sunburst: each row's parent is the nearest preceding row at depth-1.
+# Build parent-child edges directly from the depth-indentation.
 breport39$id <- paste0("n", seq_len(nrow(breport39)))
 parent_id <- character(nrow(breport39))
 stack <- list()
@@ -455,21 +454,53 @@ for (i in seq_len(nrow(breport39))) {
   stack[[d + 1]] <- list(id = breport39$id[i])
 }
 breport39$parent_id <- parent_id
-# Krona/sunburst is easiest to read limited to the higher ranks — mirrors the
-# app's sunburst maxDepth option for the small-multiples view.
-sb <- breport39[breport39$depth <= 5 & breport39$clade_reads > 0, ]
+
+# The app's sunburst (src/model/hierarchy.js's buildHierarchyTree) only ever
+# draws canonical-rank rings (root/D/K/P/C/O/F/G/S) — the "no-rank" filler
+# clades NCBI inserts between them ("cellular organisms", "Opisthokonta",
+# "Bilateria", ...) are skipped, with each canonical node reparented to its
+# nearest canonical ancestor, all the way down to species; it does *not*
+# stop at a shallow depth. Reproduce that exactly: a canonical rank code is
+# a bare letter with no trailing digit (e.g. "S", not "S1" or "D2").
+breport39$is_canonical <- grepl("^[A-Za-z]$", breport39$rank_code)
+
+find_ancestor_where <- function(node_id, is_match) {
+  idx <- match(node_id, breport39$id)
+  d <- breport39$depth[idx]
+  while (d > 0) {
+    pid <- breport39$parent_id[idx]
+    idx <- match(pid, breport39$id)
+    if (is_match[idx]) return(breport39$id[idx])
+    d <- breport39$depth[idx]
+  }
+  return(NA_character_)
+}
+
+sb <- breport39[breport39$is_canonical & breport39$clade_reads > 0, ]
+sb$canonical_parent_id <- vapply(sb$id, function(i) {
+  p <- find_ancestor_where(i, breport39$is_canonical)
+  if (is.na(p)) "" else p
+}, character(1))
+
+# Species-level rows get bracken's re-estimated counts, same merge as
+# section 1's species_table() — otherwise the outermost ring would show raw
+# Kraken2 counts while every other ring (and the app) shows bracken-corrected
+# ones.
+m <- match(sb$taxid, species_tables$barcode39$taxid)
+is_species_with_bracken <- sb$rank_code == "S" & !is.na(m)
+sb$clade_reads[is_species_with_bracken] <- species_tables$barcode39$clade_reads[m[is_species_with_bracken]]
 ```
 
-```{r sunburst-r, fig.width=6, fig.height=6}
+```{r sunburst-r, fig.width=7, fig.height=7}
 # type = "sunburst" (not "pie") is what actually renders nested rings from
 # ids/labels/parents — a pie trace ignores the parent hierarchy entirely and
 # collapses to one flat ring. branchvalues = "total" tells plotly each node's
 # value already includes its descendants' (clade_reads is a cumulative
 # count), so it doesn't try to sum children on top of the parent's own value.
 sunburst_r <- plot_ly(
-  ids = sb$id, labels = sb$name, parents = sb$parent_id,
+  ids = sb$id, labels = sb$name, parents = sb$canonical_parent_id,
   values = sb$clade_reads, type = "sunburst", branchvalues = "total"
-) %>% layout(title = "barcode39 taxonomic breakdown, depth <= 5 (R / plotly sunburst)")
+) %>% layout(title = "barcode39 taxonomic breakdown, canonical ranks root->species (R / plotly sunburst)")
 sunburst_r
 ```
 
@@ -484,24 +515,13 @@ cat(sprintf('<img src="%s" width="380"/>', file.path(app_img_dir, "barcode39-sun
 
 ```{r sankey-r-data}
 ranks_in_order <- c("D", "K", "P", "C", "O", "F", "G", "S")
-sankey_rows <- breport39[breport39$rank_code %in% ranks_in_order & breport39$clade_reads > 0, ]
-# One flow per (parent-at-adjacent-shown-rank -> node), reusing the same
-# depth-indentation parent chain as above, restricted to consecutive shown ranks.
+is_shown_rank <- breport39$rank_code %in% ranks_in_order
+sankey_rows <- breport39[is_shown_rank & breport39$clade_reads > 0, ]
+# One flow per (nearest-shown-rank-ancestor -> node), reusing the same
+# canonical-ancestor walk (find_ancestor_where) as the sunburst above,
+# restricted to the D..S ranks shown in this diagram.
 sankey_rows$rank_order <- match(sankey_rows$rank_code, ranks_in_order)
-find_rank_ancestor <- function(node_id) {
-  # walk breport39's parent chain (via depth stack rebuilt above) until we hit
-  # another canonical-rank node — the flow's source for this node.
-  idx <- match(node_id, breport39$id)
-  d <- breport39$depth[idx]
-  while (d > 0) {
-    pid <- breport39$parent_id[idx]
-    idx <- match(pid, breport39$id)
-    if (breport39$rank_code[idx] %in% ranks_in_order) return(breport39$id[idx])
-    d <- breport39$depth[idx]
-  }
-  return(NA_character_)
-}
-sankey_rows$source_id <- vapply(sankey_rows$id, find_rank_ancestor, character(1))
+sankey_rows$source_id <- vapply(sankey_rows$id, function(i) find_ancestor_where(i, is_shown_rank), character(1))
 flows <- sankey_rows[!is.na(sankey_rows$source_id), c("source_id", "id", "clade_reads", "name")]
 flows$source_name <- breport39$name[match(flows$source_id, breport39$id)]
 node_names <- union(flows$source_name, flows$name)
