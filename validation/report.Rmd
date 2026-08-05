@@ -461,10 +461,15 @@ sb <- breport39[breport39$depth <= 5 & breport39$clade_reads > 0, ]
 ```
 
 ```{r sunburst-r, fig.width=6, fig.height=6}
+# type = "sunburst" (not "pie") is what actually renders nested rings from
+# ids/labels/parents — a pie trace ignores the parent hierarchy entirely and
+# collapses to one flat ring. branchvalues = "total" tells plotly each node's
+# value already includes its descendants' (clade_reads is a cumulative
+# count), so it doesn't try to sum children on top of the parent's own value.
 sunburst_r <- plot_ly(
-  labels = sb$name, parents = ifelse(sb$parent_id == "", "", sb$name[match(sb$parent_id, sb$id)]),
-  values = sb$clade_reads, type = "pie", hole = 0.3
-) %>% layout(title = "barcode39 taxonomic breakdown, depth <= 5 (R / plotly sunburst-style)")
+  ids = sb$id, labels = sb$name, parents = sb$parent_id,
+  values = sb$clade_reads, type = "sunburst", branchvalues = "total"
+) %>% layout(title = "barcode39 taxonomic breakdown, depth <= 5 (R / plotly sunburst)")
 sunburst_r
 ```
 
