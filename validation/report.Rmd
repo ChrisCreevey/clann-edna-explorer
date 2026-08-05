@@ -312,21 +312,33 @@ raw_long$Pct <- ave(raw_long$Reads, raw_long$Sample, FUN = function(x) 100 * x /
 
 ### Composition (stacked bar, top 10 taxa by total abundance)
 
+The app stacks each bar with the most abundant taxon at the bottom and "Other" (grey) at the
+top, in descending total-abundance order (see `computeStackedComposition` in
+`src/model/comparison.js`, which keeps taxa "ordered by combined total descending", and
+`renderStackedBarSVG` in `src/viz/stacked-bar.js`, which draws `sample.values` bottom-up with
+"Other" drawn last, i.e. on top). The R plot below uses the same order — most abundant at the
+bottom, "Other" grey on top — via an explicit factor level order plus
+`position_stack(reverse = TRUE)`, instead of ggplot's default alphabetical stacking.
+
 ```{r composition-r, fig.width=5, fig.height=4.5}
-top10 <- raw_long %>%
+taxon_totals <- raw_long %>%
   group_by(Taxon) %>%
   summarise(total = sum(Reads)) %>%
-  arrange(desc(total)) %>%
-  slice_head(n = 10) %>%
-  pull(Taxon)
+  arrange(desc(total))
+top10 <- taxon_totals$Taxon[1:10]
 
 comp <- raw_long %>%
   mutate(Group = ifelse(Taxon %in% top10, Taxon, "Other")) %>%
   group_by(Sample, Group) %>%
-  summarise(Pct = sum(Pct), .groups = "drop")
+  summarise(Pct = sum(Pct), .groups = "drop") %>%
+  mutate(Group = factor(Group, levels = c(top10, "Other"))) # most-abundant-first, Other last
+
+taxon_colors <- setNames(scales::hue_pal()(10), top10)
+taxon_colors["Other"] <- "grey60"
 
 ggplot(comp, aes(x = Sample, y = Pct, fill = Group)) +
-  geom_col() +
+  geom_col(position = position_stack(reverse = TRUE)) +
+  scale_fill_manual(values = taxon_colors) +
   labs(title = "Composition, top 10 taxa (R / ggplot2)", y = "% of sample", x = NULL) +
   theme_minimal() +
   theme(legend.position = "right", legend.text = element_text(size = 7))
