@@ -549,10 +549,16 @@ node_names <- union(flows$source_name, flows$name)
 # plotly's automatic layout place it — with this many branches, plotly's
 # default arrangement doesn't reliably keep same-rank nodes aligned.
 node_rank <- sankey_rows$rank_order[match(node_names, sankey_rows$name)]
-node_x <- pmin(pmax((node_rank - 1) / (length(ranks_in_order) - 1), 0.001), 0.999)
+# Plotly draws a rightmost-column node's label to its *left* (there's no
+# plot area to its right otherwise), which collides with the genus column
+# right next to it. Compressing all columns into the left 78% of the plot
+# area — instead of spreading them the full 0-1 width — reserves a blank
+# margin for the species column's labels to sit in without overlapping
+# genus.
+node_x <- pmin(pmax((node_rank - 1) / (length(ranks_in_order) - 1), 0.001), 0.999) * 0.78
 ```
 
-```{r sankey-r, fig.width=8, fig.height=6}
+```{r sankey-r, fig.width=9, fig.height=6}
 sankey_r <- plot_ly(
   type = "sankey", orientation = "h",
   textfont = list(size = 9),
@@ -561,7 +567,10 @@ sankey_r <- plot_ly(
   link = list(source = match(flows$source_name, node_names) - 1,
               target = match(flows$name, node_names) - 1,
               value = flows$clade_reads)
-) %>% layout(title = sprintf("barcode39 read flow through ranks D->S, top %d taxa/rank (R / plotly sankey)", max_nodes_per_column))
+) %>% layout(
+  title = sprintf("barcode39 read flow through ranks D->S, top %d taxa/rank (R / plotly sankey)", max_nodes_per_column),
+  margin = list(r = 160)
+)
 sankey_r
 ```
 
