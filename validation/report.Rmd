@@ -583,7 +583,7 @@ sankey_r <- plot_ly(
 ) %>% layout(
   title = sprintf("barcode39 read flow through ranks D->S, top %d taxa/rank (R / plotly sankey)", max_nodes_per_column),
   margin = list(r = 220),
-  width = 950, height = 1050
+  width = 950, height = 750
 )
 sankey_r
 ```
