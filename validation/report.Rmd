@@ -531,10 +531,12 @@ sankey_rows <- breport39[is_shown_rank & breport39$clade_reads > 0, ]
 sankey_rows$rank_order <- match(sankey_rows$rank_code, ranks_in_order)
 sankey_rows$source_id <- vapply(sankey_rows$id, function(i) find_ancestor_where(i, is_shown_rank), character(1))
 
-# Cap each rank column to its `max_nodes_per_column` largest taxa by reads,
-# matching the app's sankeyMaxNodesPerColumn default (12) — otherwise every
-# species ends up squeezed into one unreadable column on the right.
-max_nodes_per_column <- 12
+# Cap each rank column to its `max_nodes_per_column` largest taxa by reads
+# — otherwise every species ends up squeezed into one unreadable column on
+# the right. Capped lower than the app's own default (12) because this
+# static plot, unlike the app's, has no zoom/pan to fall back on when
+# labels get tight.
+max_nodes_per_column <- 8
 top_ids <- sankey_rows %>%
   group_by(rank_order) %>%
   slice_max(clade_reads, n = max_nodes_per_column, with_ties = FALSE) %>%
@@ -549,27 +551,39 @@ node_names <- union(flows$source_name, flows$name)
 # plotly's automatic layout place it — with this many branches, plotly's
 # default arrangement doesn't reliably keep same-rank nodes aligned.
 node_rank <- sankey_rows$rank_order[match(node_names, sankey_rows$name)]
-# Plotly draws a rightmost-column node's label to its *left* (there's no
-# plot area to its right otherwise), which collides with the genus column
-# right next to it. Compressing all columns into the left 78% of the plot
-# area — instead of spreading them the full 0-1 width — reserves a blank
-# margin for the species column's labels to sit in without overlapping
-# genus.
-node_x <- pmin(pmax((node_rank - 1) / (length(ranks_in_order) - 1), 0.001), 0.999) * 0.78
+# Plotly picks which side of a thin node to draw its label on based on the
+# node's x position relative to the plot's horizontal *midpoint* (x > 0.5 ->
+# label goes on the left), not how close it is to the plot's edge — so
+# reserving a right-hand margin didn't help; the species column was still
+# past x = 0.5. Keeping every column's x at or below 0.48 instead keeps
+# every label — species included — drawn on the node's right, in the blank
+# right half of the plot reserved for exactly that.
+node_x <- pmin(pmax((node_rank - 1) / (length(ranks_in_order) - 1), 0.001), 0.999) * 0.48
 ```
 
-```{r sankey-r, fig.width=9, fig.height=6}
+```{r sankey-r, fig.width=10, fig.height=9}
+# Plotly's default arrangement = "snap" only takes node$x/y as a starting
+# hint and re-optimizes both itself — it was silently discarding the fixed
+# x positions above. arrangement = "perpendicular" pins x exactly (keeping
+# every node in its rank's column, and every node at x <= 0.48 so its label
+# renders on the right) while still letting plotly space nodes out
+# vertically within that column to avoid overlap, which fixed x/y both
+# forced by hand would not do as well. width/height are set explicitly in
+# pixels — the interactive widget doesn't reliably pick up knitr's
+# fig.width/fig.height the way a static ggplot does — with extra height so
+# a lot of thin nodes have room to spread out and stay legible.
 sankey_r <- plot_ly(
-  type = "sankey", orientation = "h",
+  type = "sankey", orientation = "h", arrangement = "perpendicular",
   textfont = list(size = 9),
-  node = list(label = node_names, x = node_x, pad = 8, thickness = 12,
+  node = list(label = node_names, x = node_x, pad = 18, thickness = 10,
               color = "#2c7fb8"),
   link = list(source = match(flows$source_name, node_names) - 1,
               target = match(flows$name, node_names) - 1,
               value = flows$clade_reads)
 ) %>% layout(
   title = sprintf("barcode39 read flow through ranks D->S, top %d taxa/rank (R / plotly sankey)", max_nodes_per_column),
-  margin = list(r = 160)
+  margin = list(r = 220),
+  width = 950, height = 1050
 )
 sankey_r
 ```
