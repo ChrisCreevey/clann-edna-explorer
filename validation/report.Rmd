@@ -320,26 +320,44 @@ top, in descending total-abundance order (see `computeStackedComposition` in
 bottom, "Other" grey on top — via an explicit factor level order plus
 `position_stack(reverse = TRUE)`, instead of ggplot's default alphabetical stacking.
 
+A global top-10-by-combined-total would be dominated by barcode39 alone (567k reads vs. ~8k for
+barcode40/42), burying each shallower sample's own dominant taxa in "Other". The app avoids this
+by taking the *union of each sample's own top 10* (`computeStackedComposition` in
+`src/model/comparison.js`: "each sample's own top N row-indices, by that column's value"), then
+keeping that union in combined-total-descending order for a stable stack/legend order. The R
+code below does the same two-step selection.
+
 ```{r composition-r, fig.width=5, fig.height=4.5}
 taxon_totals <- raw_long %>%
   group_by(Taxon) %>%
   summarise(total = sum(Reads)) %>%
   arrange(desc(total))
-top10 <- taxon_totals$Taxon[1:10]
+
+# Union of each sample's own top 10 (by that sample's read count) — not a
+# single global top 10, which would be dominated by barcode39's much
+# larger read total and hide barcode40/42's own dominant taxa in "Other".
+per_sample_top10 <- raw_long %>%
+  group_by(Sample) %>%
+  slice_max(Reads, n = 10) %>%
+  pull(Taxon) %>%
+  unique()
+
+# Keep that union in combined-total-descending order, same as the app.
+top_union <- taxon_totals$Taxon[taxon_totals$Taxon %in% per_sample_top10]
 
 comp <- raw_long %>%
-  mutate(Group = ifelse(Taxon %in% top10, Taxon, "Other")) %>%
+  mutate(Group = ifelse(Taxon %in% top_union, Taxon, "Other")) %>%
   group_by(Sample, Group) %>%
   summarise(Pct = sum(Pct), .groups = "drop") %>%
-  mutate(Group = factor(Group, levels = c(top10, "Other"))) # most-abundant-first, Other last
+  mutate(Group = factor(Group, levels = c(top_union, "Other"))) # most-abundant-first, Other last
 
-taxon_colors <- setNames(scales::hue_pal()(10), top10)
+taxon_colors <- setNames(scales::hue_pal()(length(top_union)), top_union)
 taxon_colors["Other"] <- "grey60"
 
 ggplot(comp, aes(x = Sample, y = Pct, fill = Group)) +
   geom_col(position = position_stack(reverse = TRUE)) +
   scale_fill_manual(values = taxon_colors) +
-  labs(title = "Composition, top 10 taxa (R / ggplot2)", y = "% of sample", x = NULL) +
+  labs(title = "Composition, union of each sample's top 10 (R / ggplot2)", y = "% of sample", x = NULL) +
   theme_minimal() +
   theme(legend.position = "right", legend.text = element_text(size = 7))
 ```
