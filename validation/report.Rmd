@@ -513,6 +513,14 @@ cat(sprintf('<img src="%s" width="650"/>', file.path(app_img_dir, "barcode39-sun
 </td>
 </tr></table>
 
+Left uncapped, every one of barcode39's ~450 species ends up crammed into the rightmost column
+with overlapping labels (plotly's Sankey doesn't wrap or thin text automatically). The app avoids
+this by capping each rank column to its `sankeyMaxNodesPerColumn` largest taxa (12 by default —
+see `src/app.js`), showing a note about how much is hidden below the fold. The R code below
+applies the same per-column cap, plus forces each rank into its own explicit x-position (plotly's
+default layout algorithm doesn't reliably keep same-rank nodes in one column once the graph
+branches this much) and a smaller label font.
+
 ```{r sankey-r-data}
 ranks_in_order <- c("D", "K", "P", "C", "O", "F", "G", "S")
 is_shown_rank <- breport39$rank_code %in% ranks_in_order
@@ -522,20 +530,38 @@ sankey_rows <- breport39[is_shown_rank & breport39$clade_reads > 0, ]
 # restricted to the D..S ranks shown in this diagram.
 sankey_rows$rank_order <- match(sankey_rows$rank_code, ranks_in_order)
 sankey_rows$source_id <- vapply(sankey_rows$id, function(i) find_ancestor_where(i, is_shown_rank), character(1))
-flows <- sankey_rows[!is.na(sankey_rows$source_id), c("source_id", "id", "clade_reads", "name")]
+
+# Cap each rank column to its `max_nodes_per_column` largest taxa by reads,
+# matching the app's sankeyMaxNodesPerColumn default (12) — otherwise every
+# species ends up squeezed into one unreadable column on the right.
+max_nodes_per_column <- 12
+top_ids <- sankey_rows %>%
+  group_by(rank_order) %>%
+  slice_max(clade_reads, n = max_nodes_per_column, with_ties = FALSE) %>%
+  pull(id)
+
+flows <- sankey_rows[!is.na(sankey_rows$source_id) & sankey_rows$id %in% top_ids & sankey_rows$source_id %in% top_ids,
+                      c("source_id", "id", "clade_reads", "name")]
 flows$source_name <- breport39$name[match(flows$source_id, breport39$id)]
 node_names <- union(flows$source_name, flows$name)
+
+# Force each node's x position to its own rank's column instead of letting
+# plotly's automatic layout place it — with this many branches, plotly's
+# default arrangement doesn't reliably keep same-rank nodes aligned.
+node_rank <- sankey_rows$rank_order[match(node_names, sankey_rows$name)]
+node_x <- pmin(pmax((node_rank - 1) / (length(ranks_in_order) - 1), 0.001), 0.999)
 ```
 
-```{r sankey-r, fig.width=7, fig.height=5}
+```{r sankey-r, fig.width=8, fig.height=6}
 sankey_r <- plot_ly(
   type = "sankey", orientation = "h",
-  node = list(label = node_names, pad = 10, thickness = 14,
+  textfont = list(size = 9),
+  node = list(label = node_names, x = node_x, pad = 8, thickness = 12,
               color = "#2c7fb8"),
   link = list(source = match(flows$source_name, node_names) - 1,
               target = match(flows$name, node_names) - 1,
               value = flows$clade_reads)
-) %>% layout(title = "barcode39 read flow through ranks D->S (R / plotly sankey)")
+) %>% layout(title = sprintf("barcode39 read flow through ranks D->S, top %d taxa/rank (R / plotly sankey)", max_nodes_per_column))
 sankey_r
 ```
 
@@ -548,8 +574,8 @@ cat(sprintf('<img src="%s" width="650"/>', file.path(app_img_dir, "barcode39-san
 </td>
 </tr></table>
 
-**R commands used:** `plotly::plot_ly(type = "pie", hole = 0.3, ...)` as a sunburst-style
-breakdown, `plotly::plot_ly(type = "sankey", ...)` for the rank-flow diagram.
+**R commands used:** `plotly::plot_ly(type = "sunburst", branchvalues = "total", ...)` for the
+taxonomic breakdown, `plotly::plot_ly(type = "sankey", ...)` for the rank-flow diagram.
 
 ---
 
