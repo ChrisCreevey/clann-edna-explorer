@@ -222,8 +222,19 @@ print(round(jaccard_r[samples, samples] - jaccard_app, 6))
 
 ### Similarity heatmap: R vs. app
 
+The app's heatmap colours by *similarity*, not raw distance — it inverts each cell
+(`min + max - value`, see `src/viz/heatmap.js`'s `sequentialColor`) before mapping to colour, so
+the identical-sample diagonal (distance 0) comes out **darkest**, not palest. To make this panel
+visually comparable to the app rather than its exact colour opposite, the R plot below applies
+the same inversion for colour (the printed numbers are still the real Bray-Curtis distances) and
+turns off `pheatmap`'s default hierarchical-clustering row/column reordering, since the app
+always keeps samples in their original order.
+
 ```{r similarity-heatmap-r, fig.width=4, fig.height=3.2}
-pheatmap(bray_r, display_numbers = TRUE, main = "Bray-Curtis distance (R / pheatmap)",
+similarity_r <- max(bray_r) - bray_r  # same inversion the app applies before colouring
+pheatmap(similarity_r, display_numbers = round(bray_r, 2),
+         cluster_rows = FALSE, cluster_cols = FALSE,
+         main = "Bray-Curtis similarity (R / pheatmap, app colour convention)",
          color = colorRampPalette(c("#f7fbff", "#08306b"))(50))
 ```
 
