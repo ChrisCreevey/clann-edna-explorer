@@ -376,12 +376,21 @@ cat(sprintf('<img src="%s" width="380"/>', file.path(app_img_dir, "composition-s
 
 ### Abundance heatmap (% of sample, capped to top 30 taxa)
 
+The app ranks rows by summed `pctOfTotal` across samples, not raw read count
+(`buildAbundanceMatrix` in `src/model/comparison.js` builds the heatmap's matrix with
+`valueField: 'pctOfTotal'`, then sorts by each row's own total descending) — so a taxon that's
+locally dominant in a shallow sample (barcode40/42) ranks appropriately even though its raw read
+count is tiny next to barcode39's. Also, `reshape2::dcast` alphabetizes rows by default, which
+would silently discard whatever order was computed — the R code below reorders the matrix
+explicitly after casting to keep it.
+
 ```{r abundance-heatmap-r, fig.width=5, fig.height=6}
-top30 <- raw_long %>% group_by(Taxon) %>% summarise(total = sum(Reads)) %>%
+top30 <- raw_long %>% group_by(Taxon) %>% summarise(total = sum(Pct)) %>%
   arrange(desc(total)) %>% slice_head(n = 30) %>% pull(Taxon)
 mat <- reshape2::dcast(raw_long[raw_long$Taxon %in% top30, ], Taxon ~ Sample, value.var = "Pct")
 rownames(mat) <- mat$Taxon
 mat$Taxon <- NULL
+mat <- mat[top30, ] # dcast alphabetizes rows by default — restore the ranked order
 
 pheatmap(as.matrix(mat), cluster_rows = FALSE, cluster_cols = FALSE,
          color = colorRampPalette(c("#fff5eb", "#7f2704"))(50),
