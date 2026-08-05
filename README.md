@@ -43,8 +43,11 @@ and [Clann Pangenome Explorer](https://chriscreevey.github.io/clann-pangenome-ex
 - **Taxon tagging** — flag taxa of interest (pathogens, indicator
   species, invasive species, …) by uploading a taxid/name list and/or
   typing keyword rules; tags are highlighted consistently across every
-  table and diagram. Two-column `taxon-or-taxid, category` list, no
-  header row — see
+  table and diagram. Tagging is clade-aware: tagging a higher rank (e.g.
+  "Chordata" as Host) also tags every taxon beneath it (e.g. "Homo
+  sapiens"), all the way down to species; a more specific match further
+  down the lineage overrides a broader ancestor's tag. Two-column
+  `taxon-or-taxid, category` list, no header row — see
   [`examples/taxon-category-tags.tsv`](examples/taxon-category-tags.tsv).
 - **Sample metadata** — join a CSV/TSV of per-sample metadata by ID, and
   optionally pre-populate group assignments from one of its columns.

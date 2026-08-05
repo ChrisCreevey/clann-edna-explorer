@@ -44,6 +44,8 @@
         "acceptedAnswer": { "@type": "Answer", "text": "Yes. Resolve taxonomy for your BLAST/DIAMOND hits in Clann BLAST Explorer (its built-in taxonomy database resolves full lineage from a staxids value), then use its \"Download eDNA Explorer sample\" export to produce a Lineage TSV. Loading that file here gives it the same full rank views, sunburst, Sankey diagram, and multi-sample comparison as a native Kraken2/Bracken sample — not just a flat name list." } },
       { "@type": "Question", "name": "What formats do sample metadata and taxon category tags use?",
         "acceptedAnswer": { "@type": "Answer", "text": "Both are optional CSV/TSV uploads. Sample metadata needs a header row: first column is the sample/barcode ID, every other column is an arbitrary field. Taxon category tags is a two-column taxon-name-or-taxid, category list with no header row. Example files are in the examples/ folder of the repository: sample-metadata.tsv and taxon-category-tags.tsv." } },
+      { "@type": "Question", "name": "If I tag a higher rank like \"Chordata\", does that tag apply to species beneath it?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Taxon category tags are clade-aware: tagging any rank tags that taxon and every taxon beneath it in the lineage, down to species. A more specific match further down the lineage overrides a broader ancestor's tag. Keyword rules match whole words, not partial substrings, to avoid accidental matches." } },
       { "@type": "Question", "name": "Is my data uploaded to a server?",
         "acceptedAnswer": { "@type": "Answer", "text": "No. Everything runs client-side in your browser — parsing, visualisation, and every export happen locally. Your classification results never leave your computer." } },
       { "@type": "Question", "name": "Can I compare multiple samples?",
@@ -210,6 +212,17 @@ qiime tools export --input-path taxonomy.qza --output-path exported-taxonomy</co
       <em>no header row</em> — see
       <a href="examples/taxon-category-tags.tsv" target="_blank" rel="noopener">examples/taxon-category-tags.tsv</a>.
       Open either in a spreadsheet app to build your own from a template.
+    </p>
+
+    <h3>If I tag a higher rank like "Chordata", does that tag apply to species beneath it?</h3>
+    <p>
+      Yes. Taxon category tags are clade-aware: tagging any rank — from an uploaded list or a typed keyword
+      rule — tags that taxon and every taxon beneath it in the lineage, all the way down to species. Tagging
+      "Chordata" as <em>Host</em>, for example, also tags "Homo sapiens" and every other species under it. If a
+      more specific taxon further down the lineage has its own match (e.g. "Homo sapiens" tagged separately as
+      <em>Contaminant</em>), that more specific match wins over the broader ancestor tag. Keyword rules match
+      whole words in the taxon name, not partial substrings, so a rule for "Aves" tags "Aves" and its
+      descendants without accidentally matching an unrelated name like "Cavesia".
     </p>
 
     <h3>Is my data uploaded to a server?</h3>

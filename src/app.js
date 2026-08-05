@@ -27,7 +27,7 @@
   const { parseExclusionList, matchesSearch, computeTreePruneMask } = window.ClannEDNA.filters;
   const { buildMicrobiomeAnalystExport } = window.ClannEDNA.microbiomeAnalystExport;
   const { parseSampleMetadata, matchSummary: metadataMatchSummary } = window.ClannEDNA.sampleMetadata;
-  const { parseTaxonTagList, parseKeywordRules, resolveTag } = window.ClannEDNA.tags;
+  const { parseTaxonTagList, parseKeywordRules, computeTreeTagMap } = window.ClannEDNA.tags;
   const { createExportButtons } = window.ClannEDNA.svgExport;
   const { rankTableToCsv, abundanceMatrixToCsv, diversitySummaryToCsv, distanceMatrixToCsv } = window.ClannEDNA.csvExport;
   const { computeTaxonDetail } = window.ClannEDNA.taxonDetail;
@@ -289,11 +289,18 @@
   let groupPrepopulateColumn = '';
 
   // Taxon category tagging (PLAN.md Phase 8) — a category is either an
-  // exact match from an uploaded taxid/name list or a substring match
+  // exact match from an uploaded taxid/name list or a whole-token match
   // from a typed keyword rule (src/model/tags.js resolves precedence).
   // Applied consistently across the rank table, Top-N chart, sunburst,
   // Sankey, and comparison heatmaps/stacked bar, alongside (not instead
   // of) the Phase 7 search highlight.
+  //
+  // Tags are clade-aware: a match on an ancestor (e.g. tagging "Chordata"
+  // as Host) propagates down to every descendant (e.g. "Homo sapiens"),
+  // via a single tree walk (computeTreeTagMap) rather than a per-row check
+  // — see tags.js. This runs against run.tree directly, independent of
+  // the current exclusion/abundance filters, so a taxon's tag doesn't
+  // depend on what's currently filtered out.
   let taxonTagListText = '';
   let keywordRulesText = '';
 
@@ -301,7 +308,8 @@
     const uploadedMap = parseTaxonTagList(taxonTagListText);
     const keywordRules = parseKeywordRules(keywordRulesText);
     if (uploadedMap.size === 0 && keywordRules.length === 0) return null;
-    return (name, taxid) => resolveTag(name, taxid, uploadedMap, keywordRules);
+    const { byTaxid, byName } = computeTreeTagMap(run.tree, uploadedMap, keywordRules);
+    return (name, taxid) => (taxid !== undefined && byTaxid.get(taxid)) || byName.get(name) || null;
   }
 
   function colorForCategory(category) {
@@ -790,7 +798,7 @@
     section.appendChild(
       el('p', {
         className: 'hint',
-        text: 'Highlight taxa of interest (pathogens, indicator species, invasive species) consistently across the rank table, Top-N chart, sunburst, Sankey, and comparison heatmaps.',
+        text: 'Highlight taxa of interest (pathogens, indicator species, invasive species) consistently across the rank table, Top-N chart, sunburst, Sankey, and comparison heatmaps. Tagging a higher rank (e.g. Chordata) also tags every taxon beneath it, down to species — a more specific match further down overrides a broader ancestor match.',
       })
     );
 

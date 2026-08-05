@@ -1,5 +1,6 @@
 const { test, report, assert } = require('./harness');
-const { parseTaxonTagList, parseKeywordRules, resolveTag } = require('../src/model/tags');
+const { parseTaxonTagList, parseKeywordRules, resolveTag, computeTreeTagMap } = require('../src/model/tags');
+const { TaxonomyTree } = require('../src/model/taxonomy-tree');
 
 console.log('tags.js');
 
@@ -48,6 +49,59 @@ test('resolveTag: falls back to the first matching keyword rule', () => {
 
 test('resolveTag returns null when nothing matches', () => {
   assert.strictEqual(resolveTag('Escherichia coli', 562, new Map(), []), null);
+});
+
+test('resolveTag: keyword rules match whole tokens, not substrings', () => {
+  const rules = [{ keyword: 'aves', category: 'Birds' }];
+  assert.strictEqual(resolveTag('Cavesia sp.', 1, new Map(), rules), null);
+  assert.strictEqual(resolveTag('Aves', 2, new Map(), rules), 'Birds');
+  assert.strictEqual(resolveTag('Class Aves', 3, new Map(), rules), 'Birds');
+});
+
+function buildLineageTree() {
+  const tree = new TaxonomyTree();
+  tree.getOrCreateNode(2, 'Chordata', 'P', 1, null);
+  tree.getOrCreateNode(40674, 'Mammalia', 'C', 2, 2);
+  tree.getOrCreateNode(9606, 'Homo sapiens', 'S', 3, 40674);
+  tree.getOrCreateNode(9989, 'Rodentia', 'O', 3, 40674);
+  tree.getOrCreateNode(10090, 'Mus musculus', 'S', 4, 9989);
+  return tree;
+}
+
+test('computeTreeTagMap: a keyword match on an ancestor propagates to every descendant', () => {
+  const tree = buildLineageTree();
+  const rules = [{ keyword: 'chordata', category: 'Host' }];
+  const { byTaxid } = computeTreeTagMap(tree, new Map(), rules);
+  assert.strictEqual(byTaxid.get(9606), 'Host');
+  assert.strictEqual(byTaxid.get(10090), 'Host');
+  assert.strictEqual(byTaxid.get(2), 'Host');
+});
+
+test('computeTreeTagMap: an uploaded list match also propagates to descendants', () => {
+  const tree = buildLineageTree();
+  const uploaded = new Map([['chordata', 'Host']]);
+  const { byTaxid, byName } = computeTreeTagMap(tree, uploaded, []);
+  assert.strictEqual(byTaxid.get(9606), 'Host');
+  assert.strictEqual(byName.get('Mus musculus'), 'Host');
+});
+
+test('computeTreeTagMap: a more specific descendant match wins over a broader ancestor match', () => {
+  const tree = buildLineageTree();
+  const rules = [
+    { keyword: 'chordata', category: 'Host' },
+    { keyword: 'homo sapiens', category: 'Contaminant' },
+  ];
+  const { byTaxid } = computeTreeTagMap(tree, new Map(), rules);
+  assert.strictEqual(byTaxid.get(9606), 'Contaminant');
+  assert.strictEqual(byTaxid.get(10090), 'Host');
+});
+
+test('computeTreeTagMap: unrelated branches are untagged', () => {
+  const tree = buildLineageTree();
+  const rules = [{ keyword: 'rodentia', category: 'Pest' }];
+  const { byTaxid } = computeTreeTagMap(tree, new Map(), rules);
+  assert.strictEqual(byTaxid.has(9606), false);
+  assert.strictEqual(byTaxid.get(10090), 'Pest');
 });
 
 report();
