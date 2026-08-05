@@ -242,7 +242,7 @@ pheatmap(similarity_r, display_numbers = round(bray_r, 2),
 <td style="vertical-align:top"><b>R (pheatmap, above)</b></td>
 <td style="vertical-align:top"><b>App (Export SVG)</b><br/>
 ```{r include-app-similarity, echo=FALSE, results='asis'}
-cat(sprintf('<img src="%s" width="320"/>', file.path(app_img_dir, "similarity-heatmap.svg")))
+cat(sprintf('<img src="%s" width="450"/>', file.path(app_img_dir, "similarity-heatmap.svg")))
 ```
 </td>
 </tr></table>
@@ -291,7 +291,7 @@ ggplot(pcoa_coords_r, aes(x = PCo1, y = PCo2, label = Sample)) +
 <td style="vertical-align:top"><b>R (ggplot2, above)</b></td>
 <td style="vertical-align:top"><b>App (Export SVG)</b><br/>
 ```{r include-app-pcoa, echo=FALSE, results='asis'}
-cat(sprintf('<img src="%s" width="380"/>', file.path(app_img_dir, "ordination-pcoa.svg")))
+cat(sprintf('<img src="%s" width="500"/>', file.path(app_img_dir, "ordination-pcoa.svg")))
 ```
 </td>
 </tr></table>
@@ -366,7 +366,7 @@ ggplot(comp, aes(x = Sample, y = Pct, fill = Group)) +
 <td style="vertical-align:top"><b>R (ggplot2, above)</b></td>
 <td style="vertical-align:top"><b>App (Export SVG)</b><br/>
 ```{r include-app-composition, echo=FALSE, results='asis'}
-cat(sprintf('<img src="%s" width="380"/>', file.path(app_img_dir, "composition-stacked-bar.svg")))
+cat(sprintf('<img src="%s" width="500"/>', file.path(app_img_dir, "composition-stacked-bar.svg")))
 ```
 </td>
 </tr></table>
@@ -402,7 +402,7 @@ pheatmap(as.matrix(mat), cluster_rows = FALSE, cluster_cols = FALSE,
 <td style="vertical-align:top"><b>R (pheatmap, above)</b></td>
 <td style="vertical-align:top"><b>App (Export SVG, all taxa)</b><br/>
 ```{r include-app-heatmap, echo=FALSE, results='asis'}
-cat(sprintf('<img src="%s" width="260"/>', file.path(app_img_dir, "abundance-heatmap.svg")))
+cat(sprintf('<img src="%s" width="420"/>', file.path(app_img_dir, "abundance-heatmap.svg")))
 ```
 </td>
 </tr></table>
@@ -424,7 +424,7 @@ pheatmap(pa_mat, cluster_rows = FALSE, cluster_cols = FALSE,
 <td style="vertical-align:top"><b>R (pheatmap, above)</b></td>
 <td style="vertical-align:top"><b>App (Export SVG, all taxa)</b><br/>
 ```{r include-app-presence, echo=FALSE, results='asis'}
-cat(sprintf('<img src="%s" width="260"/>', file.path(app_img_dir, "presence-absence.svg")))
+cat(sprintf('<img src="%s" width="420"/>', file.path(app_img_dir, "presence-absence.svg")))
 ```
 </td>
 </tr></table>
@@ -508,7 +508,7 @@ sunburst_r
 <td style="vertical-align:top"><b>R (plotly, above)</b></td>
 <td style="vertical-align:top"><b>App (Export SVG)</b><br/>
 ```{r include-app-sunburst, echo=FALSE, results='asis'}
-cat(sprintf('<img src="%s" width="380"/>', file.path(app_img_dir, "barcode39-sunburst.svg")))
+cat(sprintf('<img src="%s" width="650"/>', file.path(app_img_dir, "barcode39-sunburst.svg")))
 ```
 </td>
 </tr></table>
@@ -543,7 +543,7 @@ sankey_r
 <td style="vertical-align:top"><b>R (plotly, above)</b></td>
 <td style="vertical-align:top"><b>App (Export SVG)</b><br/>
 ```{r include-app-sankey, echo=FALSE, results='asis'}
-cat(sprintf('<img src="%s" width="420"/>', file.path(app_img_dir, "barcode39-sankey.svg")))
+cat(sprintf('<img src="%s" width="650"/>', file.path(app_img_dir, "barcode39-sankey.svg")))
 ```
 </td>
 </tr></table>
