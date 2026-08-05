@@ -27,6 +27,15 @@ app_img_dir  <- file.path("app_exports", "img")
 samples <- c("barcode39", "barcode40", "barcode42")
 ```
 
+> **Clann eDNA Explorer itself does not use R anywhere — it's a pure client-side JavaScript
+> app with no server and no R dependency.** This document exists purely as independent
+> quality assurance: it takes the app's own computed numbers and diagrams and checks them
+> against a completely separate implementation of the same statistics written in R, a
+> language with well-established, widely-trusted packages for exactly this kind of
+> ecological/community analysis (`vegan`, `ape`). If the app were wrong, this is the kind of
+> comparison that would catch it. It is not part of the app, isn't required to use the app,
+> and nothing here changes how the app itself works.
+
 ## What this report is
 
 This report checks that [Clann eDNA Explorer](https://github.com/chriscreevey/clann-edna-explorer)'s
