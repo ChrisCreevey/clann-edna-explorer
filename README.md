@@ -2,6 +2,8 @@
 
 # **Use it online here :** https://chriscreevey.github.io/clann-edna-explorer/
 
+Citation: [![DOI](https://zenodo.org/badge/1317523442.svg)](https://doi.org/10.5281/zenodo.22662075)
+
 
 A free, browser-based tool for exploring taxonomic classification results
 from eDNA metabarcoding and metagenomic studies. Load your Kraken2/Bracken
