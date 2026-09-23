@@ -210,6 +210,15 @@ also host it on any static host (GitHub Pages, Netlify, an internal
 web server, …), or just open `index.html` directly from disk in most
 browsers.
 
+## Funding
+
+Part of **HoloR-Tools** from the [HoloRuminant](https://holoruminant.eu/) project. This tool was
+developed with financial support from the European Union's Horizon 2020 research and innovation
+programme under grant agreement N° 101000213-HoloRuminant.
+
+This publication reflects the views only of the author, and not the European Commission (EC); the
+EC is not liable for any use that may be made of the information contained herein.
+
 ## License
 
 Free and open source under [GPL-2.0](LICENSE), developed by
