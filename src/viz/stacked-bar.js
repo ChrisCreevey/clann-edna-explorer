@@ -154,7 +154,7 @@
       label.setAttribute('x', labelX);
       label.setAttribute('y', labelY);
       label.setAttribute('font-size', '10');
-      label.setAttribute('fill', 'var(--text)');
+      label.setAttribute('fill', 'var(--ink)');
       label.setAttribute('text-anchor', 'end');
       label.setAttribute('transform', `rotate(-60 ${labelX} ${labelY})`);
       label.textContent = labelFn(sample.sampleId);
@@ -195,7 +195,7 @@
         text.setAttribute('x', legendX + 11);
         text.setAttribute('y', legendY + 8);
         text.setAttribute('font-size', '9');
-        text.setAttribute('fill', highlighted ? 'var(--accent)' : 'var(--text)');
+        text.setAttribute('fill', highlighted ? 'var(--accent)' : 'var(--ink)');
         if (highlighted) text.setAttribute('font-weight', 'bold');
         text.textContent = name;
         group.appendChild(text);

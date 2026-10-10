@@ -122,7 +122,7 @@
     xLabelEl.setAttribute('y', padding.top + plotHeight + 30);
     xLabelEl.setAttribute('text-anchor', 'middle');
     xLabelEl.setAttribute('font-size', '11');
-    xLabelEl.setAttribute('fill', 'var(--text)');
+    xLabelEl.setAttribute('fill', 'var(--ink)');
     xLabelEl.textContent = xLabel;
     svg.appendChild(xLabelEl);
 
@@ -131,7 +131,7 @@
     yLabelEl.setAttribute('y', 14);
     yLabelEl.setAttribute('text-anchor', 'middle');
     yLabelEl.setAttribute('font-size', '11');
-    yLabelEl.setAttribute('fill', 'var(--text)');
+    yLabelEl.setAttribute('fill', 'var(--ink)');
     yLabelEl.setAttribute('transform', 'rotate(-90)');
     yLabelEl.textContent = yLabel;
     svg.appendChild(yLabelEl);
@@ -156,7 +156,7 @@
         text.setAttribute('x', lx + 16);
         text.setAttribute('y', legendY + 9);
         text.setAttribute('font-size', '10');
-        text.setAttribute('fill', 'var(--text)');
+        text.setAttribute('fill', 'var(--ink)');
         text.textContent = item.label;
         svg.appendChild(text);
         lx += 16 + item.label.length * 6 + 14;
@@ -178,7 +178,7 @@
         text.setAttribute('x', lx + 11);
         text.setAttribute('y', legendY + 8);
         text.setAttribute('font-size', '10');
-        text.setAttribute('fill', 'var(--text)');
+        text.setAttribute('fill', 'var(--ink)');
         text.textContent = item.label;
         svg.appendChild(text);
         lx += 16 + item.label.length * 6 + 12;
@@ -211,7 +211,7 @@
       minText.setAttribute('x', padding.left);
       minText.setAttribute('y', legendY + 22);
       minText.setAttribute('font-size', '9');
-      minText.setAttribute('fill', 'var(--text)');
+      minText.setAttribute('fill', 'var(--ink)');
       minText.textContent = colorLegend.min.toFixed(2);
       svg.appendChild(minText);
 
@@ -220,7 +220,7 @@
       maxText.setAttribute('y', legendY + 22);
       maxText.setAttribute('text-anchor', 'end');
       maxText.setAttribute('font-size', '9');
-      maxText.setAttribute('fill', 'var(--text)');
+      maxText.setAttribute('fill', 'var(--ink)');
       maxText.textContent = colorLegend.max.toFixed(2);
       svg.appendChild(maxText);
 
@@ -228,7 +228,7 @@
       label.setAttribute('x', padding.left + 130);
       label.setAttribute('y', legendY + 9);
       label.setAttribute('font-size', '10');
-      label.setAttribute('fill', 'var(--text)');
+      label.setAttribute('fill', 'var(--ink)');
       label.textContent = colorLegend.label || '';
       svg.appendChild(label);
     }

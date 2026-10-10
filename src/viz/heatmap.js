@@ -24,6 +24,13 @@
     return `hsl(${hue}, 55%, ${lightness}%)`;
   }
 
+  // Cell fills are fixed hsl() colours (the same in both themes), so the
+  // number printed on a cell follows the cell's lightness, not the theme.
+  function valueTextColor(fill) {
+    const m = /hsl\(\s*[\d.]+\s*,\s*[\d.]+%\s*,\s*([\d.]+)%\s*\)/.exec(fill);
+    return m && Number(m[1]) < 55 ? '#fff' : '#111';
+  }
+
   function binaryColor(value) {
     return value ? 'hsl(152, 55%, 40%)' : 'hsl(0, 0%, 88%)';
   }
@@ -110,7 +117,7 @@
       text.setAttribute('x', x);
       text.setAttribute('y', headerHeight - 4);
       text.setAttribute('font-size', '10');
-      text.setAttribute('fill', 'var(--text)');
+      text.setAttribute('fill', 'var(--ink)');
       text.setAttribute('text-anchor', 'start');
       text.setAttribute('transform', `rotate(-60 ${x} ${headerHeight - 4})`);
       text.textContent = label;
@@ -141,7 +148,7 @@
       rowLabelText.setAttribute('x', labelWidth - 6);
       rowLabelText.setAttribute('y', y + cellHeight / 2 + 3);
       rowLabelText.setAttribute('font-size', '10');
-      rowLabelText.setAttribute('fill', highlighted ? 'var(--accent)' : category ? colorForCategory(category) : 'var(--text)');
+      rowLabelText.setAttribute('fill', highlighted ? 'var(--accent)' : category ? colorForCategory(category) : 'var(--ink)');
       rowLabelText.setAttribute('font-weight', highlighted || category ? 'bold' : 'normal');
       rowLabelText.setAttribute('text-anchor', 'end');
       rowLabelText.textContent = label;
@@ -158,7 +165,8 @@
         rect.setAttribute('y', y);
         rect.setAttribute('width', cellWidth - 1);
         rect.setAttribute('height', cellHeight - 1);
-        rect.setAttribute('fill', colorFn(value, min, max));
+        const cellFill = colorFn(value, min, max);
+        rect.setAttribute('fill', cellFill);
         if (highlighted) {
           rect.setAttribute('stroke', 'var(--accent)');
           rect.setAttribute('stroke-width', '2');
@@ -187,7 +195,7 @@
           valueText.setAttribute('y', y + cellHeight / 2 + 3);
           valueText.setAttribute('font-size', '8');
           valueText.setAttribute('text-anchor', 'middle');
-          valueText.setAttribute('fill', '#111');
+          valueText.setAttribute('fill', valueTextColor(cellFill));
           valueText.style.pointerEvents = 'none';
           valueText.textContent = Number.isInteger(value) ? value : value.toFixed(2);
           svg.appendChild(valueText);

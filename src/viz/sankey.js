@@ -315,7 +315,7 @@ function renderSankeySVG(container, layout, { width, height, isHighlighted = nul
     label.setAttribute('x', n.x + layout.nodeWidth + 4);
     label.setAttribute('y', labelY);
     label.setAttribute('font-size', '10');
-    label.setAttribute('fill', 'var(--text)');
+    label.setAttribute('fill', 'var(--ink)');
     label.textContent = n.name;
     labelGroup.appendChild(label);
   });
