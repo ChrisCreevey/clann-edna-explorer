@@ -5,13 +5,24 @@
   const { filesFromFileInput } = window.ClannEDNA.folderLoader;
   const { buildSample, guessSampleIdFromFilename } = window.ClannEDNA.sample;
   const { computeSampleSummary } = window.ClannEDNA.summary;
-  const { RANK_ORDER, computeAvailableRanks, computeRankTable, computeGenericTable, sortRows, computeTopN } =
+  const { RANK_ORDER, computeAvailableRanks, computeRankTable, sortRows, computeTopN } =
     window.ClannEDNA.rankTable;
   const { TaxonomyTree } = window.ClannEDNA.taxonomyTree;
   const { parseBreport } = window.ClannEDNA.breport;
   const { parseBracken } = window.ClannEDNA.bracken;
-  const { parseGeneric } = window.ClannEDNA.generic;
   const { parseLineageTsv } = window.ClannEDNA.lineageTsv;
+  const {
+    readTable,
+    guessMapping,
+    validateMapping,
+    layoutOf,
+    buildLineageRows,
+    importTable,
+    describeMapping,
+    ROLE_LABELS,
+    ROLE_OPTIONS,
+    POSITIONAL_RANKS,
+  } = window.ClannEDNA.tableImport;
   const { captureProvenance } = window.ClannEDNA.provenance;
   const { buildHierarchyTree } = window.ClannEDNA.hierarchy;
   const { renderSunburstSVG } = window.ClannEDNA.sunburst;
@@ -33,14 +44,17 @@
   const { computeTaxonDetail } = window.ClannEDNA.taxonDetail;
 
   const BLAST_EXPLORER_URL = 'https://chriscreevey.github.io/clann-blast-explorer/';
-  const parsers = { parseBreport, parseBracken, parseGeneric, parseLineageTsv, captureProvenance };
+  const parsers = { parseBreport, parseBracken, parseLineageTsv, captureProvenance };
 
   const folderInput = document.getElementById('folder-input');
   const uploadBtn = document.getElementById('uploadBtn');
   const emptyOpenBtn = document.getElementById('emptyOpen');
   const tickList = document.getElementById('file-ticklist');
   const loadEmptyState = document.getElementById('load-empty-state');
+  const loadEmptyStateDefault = loadEmptyState.innerHTML;
   const loadBtn = document.getElementById('load-selected-btn');
+  const importCancelBtn = document.getElementById('import-cancel-btn');
+  const importEl = document.getElementById('import');
   const explorerEl = document.getElementById('explorer');
   const emptyEl = document.getElementById('empty');
   const hTitle = document.getElementById('hTitle');
@@ -51,8 +65,13 @@
   // dropped. Tracked for a later phase.
   const COMPRESSED_RE = /\.(gz|zip)$/i;
 
-  function readFileHead(file, byteLimit = 8192) {
-    return file.slice(0, byteLimit).text();
+  // Cut back to the last full line when the file is longer than the
+  // limit, so the sniffer never sees a half row.
+  async function readFileHead(file, byteLimit = 8192) {
+    const head = await file.slice(0, byteLimit).text();
+    if (file.size <= byteLimit) return head;
+    const lastNewline = head.lastIndexOf('\n');
+    return lastNewline > 0 ? head.slice(0, lastNewline) : head;
   }
 
   async function sniffFile(file) {
@@ -79,111 +98,322 @@
     if (result.format === 'lineage-tsv') return 'Lineage TSV';
     if (result.format === 'qiime-taxonomy') return 'QIIME2 taxonomy.tsv';
     if (result.format === 'qiime-biom-tsv') return 'QIIME2 feature-table.tsv';
-    if (result.format === 'generic') return result.confidence === 'unconfirmed' ? 'generic (unconfirmed)' : 'generic';
+    if (result.format === 'generic') return result.confidence === 'remembered' ? 'table (saved mapping)' : 'table — check mapping';
     return 'not recognised';
   }
 
-  // ---- Tick-list ----------------------------------------------------
+  // ---- Remembered column mappings (per header row) ------------------
+  //
+  // A per-browser convenience only: the next export from the same tool
+  // (same header row) loads with the mapping the user last confirmed.
+  // Storage can be unavailable (private window, blocked site data), in
+  // which case every table simply starts from the suggested guess.
 
-  let currentResults = []; // [{file, format, confidence, reason?, candidateNameColumn?, candidateAbundanceColumn?}]
+  const MAPPING_STORE_KEY = 'clann-edna-table-mappings';
+
+  function readStoredMappings() {
+    try {
+      return JSON.parse(localStorage.getItem(MAPPING_STORE_KEY) || '{}') || {};
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function storedMappingFor(signature, columnCount) {
+    const m = readStoredMappings()[signature];
+    return m && Array.isArray(m.roles) && m.roles.length === columnCount ? m : null;
+  }
+
+  function writeStoredMapping(signature, mapping) {
+    try {
+      const all = readStoredMappings();
+      if (mapping) all[signature] = mapping;
+      else delete all[signature];
+      localStorage.setItem(MAPPING_STORE_KEY, JSON.stringify(all));
+    } catch (err) {
+      // storage blocked — remembering is optional
+    }
+  }
+
+  // ---- Import view (main pane) ----------------------------------------
+  //
+  // Picking files opens this view in place of the explorer/hero: the wide
+  // pane leaves room for a column-mapping table on any file that isn't a
+  // native format. Cancel returns to whatever was showing before.
+
+  let currentResults = []; // [{file, format, confidence, reason?, mapping?, ...}]
+
+  function setImportOpen(open) {
+    importEl.style.display = open ? '' : 'none';
+    syncMainView();
+    // On narrow screens the sidebar stacks above the main pane, so bring
+    // the import view into sight rather than leaving it below the fold.
+    if (open) importEl.scrollIntoView({ block: 'start' });
+  }
+
+  function isImportOpen() {
+    return importEl.style.display !== 'none';
+  }
+
+  function syncMainView() {
+    const importing = isImportOpen();
+    explorerEl.style.display = !importing && run.samples.size > 0 ? '' : 'none';
+    emptyEl.style.display = !importing && run.samples.size === 0 ? '' : 'none';
+  }
 
   function buildTickListRow(result, index, usable) {
-    const li = document.createElement('li');
+    const li = el('li', { className: 'import-file' });
     li.dataset.disabled = String(!usable);
     li.dataset.index = String(index);
 
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.checked = usable && result.confidence === 'high';
-    checkbox.disabled = !usable;
-    checkbox.className = 'row-checkbox';
-
     const isQiimeWholeRunFile = result.format === 'qiime-taxonomy' || result.format === 'qiime-biom-tsv';
+    const isTable = result.format === 'generic';
 
-    const nameInput = document.createElement('input');
-    nameInput.type = 'text';
-    nameInput.className = 'sample-name-input';
+    const checkbox = el('input', { type: 'checkbox', className: 'row-checkbox' });
+    checkbox.checked = usable && (result.confidence === 'high' || (isTable && result.included));
+    checkbox.disabled = !usable;
+    checkbox.addEventListener('change', () => {
+      result.included = checkbox.checked;
+    });
+    const includeLabel = el('label', { className: 'include-label' }, [checkbox, document.createTextNode(' Include')]);
+
+    const nameInput = el('input', { type: 'text', className: 'sample-name-input' });
     if (isQiimeWholeRunFile) {
-      nameInput.value = '';
       nameInput.placeholder =
         result.format === 'qiime-biom-tsv' ? 'provides every sample in this run' : 'taxonomy lookup — no sample name needed';
       nameInput.disabled = true;
     } else {
-      nameInput.value = guessSampleIdFromFilename(result.file.name);
+      nameInput.value = result.sampleName ?? guessSampleIdFromFilename(result.file.name);
       nameInput.title = 'Sample name — files sharing this name are merged into one sample';
       nameInput.disabled = !usable;
+      nameInput.addEventListener('input', () => {
+        result.sampleName = nameInput.value;
+        if (isTable) refreshMappingSummary(result);
+      });
     }
 
-    const filename = document.createElement('span');
-    filename.textContent = result.file.name;
-    filename.style.flex = '1';
-    filename.className = 'filename';
-
-    const label = document.createElement('span');
-    label.className = 'format-label';
-    label.textContent = formatLabel(result);
-
-    li.appendChild(checkbox);
-    li.appendChild(nameInput);
-    li.appendChild(filename);
-    li.appendChild(label);
+    const head = el('div', { className: 'import-file-head' }, [
+      includeLabel,
+      nameInput,
+      el('span', { className: 'filename', text: result.file.name, title: result.file.name }),
+      el('span', { className: 'format-label', text: formatLabel(result) }),
+    ]);
+    li.appendChild(head);
 
     if (!usable || result.confidence === 'unconfirmed') {
-      const reason = document.createElement('span');
-      reason.className = 'reason';
-      reason.textContent = result.reason || '';
-      li.appendChild(reason);
+      li.appendChild(el('div', { className: 'reason', text: result.reason || '' }));
     }
 
-    if (result.format === 'generic' || (!usable && result.candidateNameColumn === undefined)) {
-      const mappingRow = document.createElement('div');
-      mappingRow.className = 'column-mapping';
-
-      const nameColLabel = document.createElement('label');
-      nameColLabel.textContent = 'name col ';
-      const nameColInput = document.createElement('input');
-      nameColInput.type = 'number';
-      nameColInput.min = '0';
-      nameColInput.className = 'name-col-input';
-      nameColInput.value = String(result.candidateNameColumn ?? 0);
-      nameColLabel.appendChild(nameColInput);
-
-      const abColLabel = document.createElement('label');
-      abColLabel.textContent = ' abundance col ';
-      const abColInput = document.createElement('input');
-      abColInput.type = 'number';
-      abColInput.min = '0';
-      abColInput.className = 'abundance-col-input';
-      abColInput.value = String(result.candidateAbundanceColumn ?? 1);
-      abColLabel.appendChild(abColInput);
-
-      mappingRow.appendChild(nameColLabel);
-      mappingRow.appendChild(abColLabel);
-
-      if (!usable) {
-        const forceBtn = document.createElement('button');
-        forceBtn.type = 'button';
-        forceBtn.textContent = 'Try as generic';
-        forceBtn.addEventListener('click', () => {
-          result.format = 'generic';
-          result.confidence = 'unconfirmed';
-          renderTickList(currentResults);
-        });
-        mappingRow.appendChild(forceBtn);
-      }
-
-      li.appendChild(mappingRow);
+    if (isTable && usable) {
+      result.ui = { checkbox, nameInput };
+      li.appendChild(buildMappingEditor(result));
     }
 
     return li;
   }
 
+  // ---- Column-mapping editor ------------------------------------------
+
+  const PREVIEW_ROWS = 5;
+  const PREVIEW_CELL_CHARS = 28;
+
+  function buildMappingEditor(result) {
+    const details = el('details', { className: 'mapping-editor' });
+    details.open = result.confidence !== 'remembered';
+    details.appendChild(
+      el('summary', { text: result.confidence === 'remembered' ? 'Column mapping (saved from a previous load)' : 'Column mapping' })
+    );
+    const body = el('div', { className: 'mapping-body' }, [el('div', { className: 'hint', text: 'Reading file…' })]);
+    details.appendChild(body);
+    result.ui.body = body;
+
+    // The sniffer only saw the first few KB; the editor works on the whole
+    // file so the summary (samples, rows, ranks) is exact.
+    const ready = result.table
+      ? Promise.resolve()
+      : result.file.text().then((text) => {
+          result.text = text;
+          result.table = readTable(text, result.mapping.delimiter);
+        });
+    ready
+      .then(() => renderMappingBody(result))
+      .catch((err) => {
+        body.innerHTML = '';
+        body.appendChild(el('div', { className: 'mapping-error', text: `Could not read file: ${err.message}` }));
+      });
+    return details;
+  }
+
+  function renderMappingBody(result) {
+    const { body } = result.ui;
+    const { table, mapping } = result;
+    body.innerHTML = '';
+    if (!table) {
+      body.appendChild(el('div', { className: 'mapping-error', text: 'Could not split this file into columns.' }));
+      return;
+    }
+
+    const delimName = { '\t': 'tab', ',': 'comma', ';': 'semicolon' }[table.delimiter] || table.delimiter;
+    body.appendChild(
+      el('p', {
+        className: 'hint',
+        text: `${delimName}-separated · ${table.hasHeader ? 'header row' : 'no header row'} · ${table.rows.length.toLocaleString()} data rows. Set what each column holds; anything left as "Ignore" is not used.`,
+      })
+    );
+
+    const scroller = el('div', { className: 'mapping-table-scroll' });
+    const tableEl = el('table', { className: 'mapping-table' });
+    const headRow = el('tr');
+    const roleRow = el('tr', { className: 'role-row' });
+    table.header.forEach((name, c) => {
+      headRow.appendChild(el('th', { text: name, title: name }));
+      const select = el('select', { 'aria-label': `Role for column ${name}` });
+      ROLE_OPTIONS.forEach((role) => {
+        const opt = el('option', { value: role, text: ROLE_LABELS[role] });
+        if (mapping.roles[c] === role) opt.selected = true;
+        select.appendChild(opt);
+      });
+      select.addEventListener('change', () => {
+        mapping.roles[c] = select.value;
+        roleRow.children[c].dataset.role = select.value;
+        refreshMappingSummary(result);
+      });
+      const td = el('td', {}, [select]);
+      td.dataset.role = mapping.roles[c];
+      roleRow.appendChild(td);
+    });
+    const thead = el('thead', {}, [headRow, roleRow]);
+    const tbody = el('tbody');
+    table.rows.slice(0, PREVIEW_ROWS).forEach((row) => {
+      const tr = el('tr');
+      table.header.forEach((_, c) => {
+        const v = row[c] ?? '';
+        tr.appendChild(el('td', { text: v.length > PREVIEW_CELL_CHARS ? `${v.slice(0, PREVIEW_CELL_CHARS)}…` : v, title: v }));
+      });
+      tbody.appendChild(tr);
+    });
+    tableEl.appendChild(thead);
+    tableEl.appendChild(tbody);
+    scroller.appendChild(tableEl);
+    body.appendChild(scroller);
+
+    const optionDefs = [
+      ['underscoresToSpaces', 'Replace underscores in names with spaces (e.g. Genus_species)'],
+      ['prefixGenusToSpecies', 'Species column holds only the epithet — prefix it with the genus'],
+      ['cumulativeRows', 'Rows are cumulative clade totals (MetaPhlAn-style) — count only the most specific rows'],
+    ];
+    const opts = el('div', { className: 'mapping-options' });
+    optionDefs.forEach(([key, label]) => {
+      const box = el('input', { type: 'checkbox' });
+      box.checked = Boolean(mapping.options[key]);
+      box.addEventListener('change', () => {
+        mapping.options[key] = box.checked;
+        refreshMappingSummary(result);
+      });
+      opts.appendChild(el('label', {}, [box, document.createTextNode(` ${label}`)]));
+    });
+    body.appendChild(opts);
+
+    const summary = el('div', { className: 'mapping-summary', 'aria-live': 'polite' });
+    body.appendChild(summary);
+    result.ui.summary = summary;
+
+    const actions = el('div', { className: 'mapping-actions' });
+    const resetBtn = el('button', { type: 'button', className: 'act', text: 'Reset to suggested mapping' });
+    resetBtn.addEventListener('click', () => {
+      result.mapping = guessMapping(table);
+      if (result.confidence === 'remembered') {
+        writeStoredMapping(result.signature, null);
+        result.confidence = 'unconfirmed';
+      }
+      renderMappingBody(result);
+    });
+    actions.appendChild(resetBtn);
+    body.appendChild(actions);
+
+    refreshMappingSummary(result);
+  }
+
+  const RANK_LABEL_ORDER = ['species', 'genus', 'family', 'order', 'class', 'phylum', 'kingdom', 'superkingdom'];
+
+  function plannedTableSampleIds(result, sampleName) {
+    return [...buildLineageRows(result.table, result.mapping, sampleName).samples.keys()];
+  }
+
+  function refreshMappingSummary(result) {
+    const { summary, checkbox, nameInput } = result.ui;
+    if (!summary || !result.table) return;
+    const { table, mapping } = result;
+    summary.innerHTML = '';
+
+    const layout = layoutOf(mapping);
+    nameInput.disabled = layout !== 'single';
+    nameInput.placeholder = layout === 'long' ? 'from the Sample ID column' : layout === 'wide' ? 'one sample per count column' : '';
+    if (layout !== 'single') nameInput.value = '';
+    else if (!nameInput.value) nameInput.value = result.sampleName ?? guessSampleIdFromFilename(result.file.name);
+
+    const errors = validateMapping(mapping);
+    if (layout === 'single' && !nameInput.value.trim()) errors.push('Give this file a sample name.');
+    result.mappingErrors = errors;
+    checkbox.disabled = errors.length > 0;
+    if (errors.length > 0) {
+      checkbox.checked = false;
+      result.included = false;
+      errors.forEach((e) => summary.appendChild(el('div', { className: 'mapping-error', text: e })));
+      return;
+    }
+
+    const { samples, stats } = buildLineageRows(table, mapping, nameInput.value.trim());
+    const layoutText = {
+      long: 'Long layout — one row per sample × taxon',
+      wide: 'Wide layout — taxa as rows, one count column per sample',
+      single: 'Single sample — the whole file is one sample',
+    }[layout];
+    const deepest = RANK_LABEL_ORDER.filter((r) => stats.deepestRank[r] > 0)
+      .map((r) => `${r} ${stats.deepestRank[r].toLocaleString()}`)
+      .join(', ');
+    summary.appendChild(el('div', { className: 'mapping-layout', text: layoutText }));
+    const facts = [
+      `${samples.size.toLocaleString()} sample${samples.size === 1 ? '' : 's'}`,
+      `${(stats.dataRows - stats.skippedRows - stats.cumulativeRowsDropped).toLocaleString()} rows used`,
+      `${stats.unclassifiedRows.toLocaleString()} unclassified`,
+    ];
+    if (stats.skippedRows > 0) facts.push(`${stats.skippedRows.toLocaleString()} skipped (no count or sample)`);
+    if (stats.cumulativeRowsDropped > 0) facts.push(`${stats.cumulativeRowsDropped.toLocaleString()} clade-total rows dropped`);
+    summary.appendChild(el('div', { text: facts.join(' · ') }));
+    if (deepest) summary.appendChild(el('div', { text: `Rows by most specific rank: ${deepest}` }));
+
+    const firstPath = [...samples.values()].flatMap((s) => s.rows).find((r) => r.path.length > 0);
+    if (firstPath) {
+      summary.appendChild(
+        el('div', { className: 'mapping-example', text: `e.g. ${firstPath.path.map((p) => p.name).join(' › ')}` })
+      );
+    }
+
+    const warnings = [];
+    if (stats.nonIntegerCounts > 0) {
+      warnings.push(
+        `${stats.nonIntegerCounts.toLocaleString()} counts aren't whole numbers (relative abundances?) — they'll be treated as read counts.`
+      );
+    }
+    if (mapping.roles.includes('lineage')) {
+      warnings.push(
+        `Lineage levels without a rank prefix (k__, p__ …) are read in order as ${POSITIONAL_RANKS.join(', ')}.`
+      );
+    }
+    if (stats.droppedLineageLevels > 0) {
+      warnings.push(`${stats.droppedLineageLevels.toLocaleString()} lineage levels didn't fit a known rank and were dropped.`);
+    }
+    const clashes = [...samples.keys()].filter((id) => run.samples.has(id));
+    if (clashes.length > 0) {
+      warnings.push(`Already loaded, will be replaced: ${clashes.slice(0, 5).join(', ')}${clashes.length > 5 ? '…' : ''}`);
+    }
+    warnings.forEach((w) => summary.appendChild(el('div', { className: 'mapping-warning', text: w })));
+  }
+
   function renderTickList(results) {
     currentResults = results;
     tickList.innerHTML = '';
-    tickList.style.display = results.length === 0 ? 'none' : '';
-    loadEmptyState.style.display = results.length === 0 ? '' : 'none';
-    loadBtn.style.display = results.some((r) => r.format !== 'unknown') ? '' : 'none';
 
     // Recognised files first, so the files you actually want to load
     // aren't buried among ones that didn't sniff as a known format —
@@ -197,30 +427,36 @@
     });
 
     if (invalidIndices.length > 0) {
-      const wrapperLi = document.createElement('li');
-      wrapperLi.className = 'invalid-files-wrapper';
-
-      const details = document.createElement('details');
-      details.className = 'invalid-files-section';
-      const summary = document.createElement('summary');
-      summary.textContent = `Other files not recognised (${invalidIndices.length})`;
-      details.appendChild(summary);
-
-      const invalidList = document.createElement('ul');
-      invalidList.className = 'invalid-files-list';
+      const wrapperLi = el('li', { className: 'invalid-files-wrapper' });
+      const details = el('details', { className: 'invalid-files-section' });
+      details.appendChild(el('summary', { text: `Other files not recognised (${invalidIndices.length})` }));
+      const invalidList = el('ul', { className: 'invalid-files-list' });
       invalidIndices.forEach((i) => {
         invalidList.appendChild(buildTickListRow(results[i], i, false));
       });
       details.appendChild(invalidList);
-
       wrapperLi.appendChild(details);
       tickList.appendChild(wrapperLi);
     }
+
+    loadBtn.disabled = validIndices.length === 0;
   }
 
   async function handleFiles(files) {
+    if (files.length === 0) return;
     const results = await Promise.all(files.map(sniffFile));
+    for (const result of results) {
+      if (result.format !== 'generic') continue;
+      const stored = storedMappingFor(result.signature, result.header.length);
+      if (stored) {
+        result.mapping = { ...stored, roles: [...stored.roles], options: { ...stored.options } };
+        result.confidence = 'remembered';
+        result.included = validateMapping(result.mapping).length === 0;
+      }
+    }
     renderTickList(results);
+    loadEmptyState.textContent = `${files.length} file${files.length === 1 ? '' : 's'} chosen — review them in the main pane, then Load selected.`;
+    setImportOpen(true);
   }
 
   // A single "Choose files…" affordance appears in two places (the header,
@@ -234,6 +470,7 @@
 
   folderInput.addEventListener('change', async (event) => {
     const files = filesFromFileInput(event.target.files);
+    event.target.value = ''; // so re-picking the same file fires again
     await handleFiles(files);
   });
 
@@ -318,9 +555,27 @@
     return `hsl(${(hash % 360)}, 70%, 45%)`;
   }
 
+  // A sample built straight into run.tree by a whole-file reader (QIIME 2
+  // pair, mapped table) rather than through buildSample's per-file buckets.
+  function treeSample(sampleId, sourceFiles, provenance = null) {
+    return {
+      id: sampleId,
+      displayName: sampleId,
+      hasBreport: false,
+      hasBracken: false,
+      hasLineageTsv: false,
+      provenance,
+      sourceFiles,
+      group: null,
+      groupSource: null,
+      metadata: null,
+    };
+  }
+
   async function loadSelected() {
-    const rows = Array.from(tickList.querySelectorAll('li'));
-    const grouped = new Map(); // sampleName -> {breport?, bracken?, generic?}
+    const rows = Array.from(tickList.querySelectorAll('li.import-file'));
+    const grouped = new Map(); // sampleName -> {breport?, bracken?, lineageTsv?}
+    const tables = []; // mapped generic tables: [{result, sampleName}]
     let qiimeTaxonomyFile = null;
     let qiimeBiomTsvFile = null;
 
@@ -340,6 +595,13 @@
       }
 
       const sampleName = li.querySelector('.sample-name-input').value.trim();
+
+      if (result.format === 'generic') {
+        if (!result.table || (result.mappingErrors && result.mappingErrors.length > 0)) continue;
+        tables.push({ result, sampleName });
+        continue;
+      }
+
       if (!sampleName) continue;
 
       if (!grouped.has(sampleName)) grouped.set(sampleName, {});
@@ -352,10 +614,6 @@
         bucket.bracken = { text, filename: result.file.name };
       } else if (result.format === 'lineage-tsv') {
         bucket.lineageTsv = { text, filename: result.file.name, columnIndex: result.columnIndex };
-      } else if (result.format === 'generic') {
-        const nameColumn = Number(li.querySelector('.name-col-input').value);
-        const abundanceColumn = Number(li.querySelector('.abundance-col-input').value);
-        bucket.generic = { text, filename: result.file.name, mapping: { nameColumn, abundanceColumn } };
       }
     }
 
@@ -366,33 +624,47 @@
       return;
     }
 
-    if (grouped.size === 0 && !qiimeTaxonomyFile) {
+    if (grouped.size === 0 && !qiimeTaxonomyFile && tables.length === 0) {
       alert('Tick at least one recognised file, and give it a sample name, before loading.');
       return;
     }
 
-    let firstQiimeSampleId = null;
+    // Mapped tables write straight into the shared tree, so two files (or a
+    // table and a native file) producing the same sample name would merge
+    // counts silently — refuse that up front instead.
+    const seen = new Map([...grouped.keys()].map((id) => [id, 'another selected file']));
+    for (const { result, sampleName } of tables) {
+      for (const id of plannedTableSampleIds(result, sampleName)) {
+        if (seen.has(id)) {
+          alert(`Sample "${id}" from ${result.file.name} clashes with ${seen.get(id)}. Rename one of them before loading.`);
+          return;
+        }
+        seen.set(id, result.file.name);
+      }
+    }
+
+    let firstNewSampleId = null;
     if (qiimeTaxonomyFile && qiimeBiomTsvFile) {
       const { parseQiimeTaxonomy, buildQiimeSamples } = window.ClannEDNA.qiime;
       const taxonomyByFeatureId = parseQiimeTaxonomy(qiimeTaxonomyFile.text);
       const { sampleIds } = buildQiimeSamples(qiimeBiomTsvFile.text, taxonomyByFeatureId, run.tree);
       for (const sampleId of sampleIds) {
-        run.samples.set(sampleId, {
-          id: sampleId,
-          displayName: sampleId,
-          kind: 'tree',
-          hasBreport: false,
-          hasBracken: false,
-          hasLineageTsv: false,
-          provenance: null,
-          genericRows: null,
-          sourceFiles: [qiimeTaxonomyFile.filename, qiimeBiomTsvFile.filename],
-          group: null,
-          groupSource: null,
-          metadata: null,
-        });
+        run.samples.set(sampleId, treeSample(sampleId, [qiimeTaxonomyFile.filename, qiimeBiomTsvFile.filename]));
       }
-      firstQiimeSampleId = sampleIds[0] || null;
+      firstNewSampleId = sampleIds[0] || null;
+    }
+
+    for (const { result, sampleName } of tables) {
+      const { sampleIds } = importTable(result.text, result.mapping, run.tree, sampleName);
+      const provenance = {
+        'Imported from': result.file.name,
+        'Column mapping': describeMapping(result.table, result.mapping),
+      };
+      for (const sampleId of sampleIds) {
+        run.samples.set(sampleId, treeSample(sampleId, [result.file.name], provenance));
+      }
+      firstNewSampleId = firstNewSampleId || sampleIds[0] || null;
+      writeStoredMapping(result.signature, result.mapping);
     }
 
     for (const [sampleId, inputs] of grouped) {
@@ -403,17 +675,15 @@
     activeSampleId =
       activeSampleId && run.samples.has(activeSampleId)
         ? activeSampleId
-        : grouped.keys().next().value || firstQiimeSampleId;
+        : grouped.keys().next().value || firstNewSampleId;
 
-    // Once a run is loaded, the tick-list has done its job — leaving it
-    // sitting there under "Choose files…" is just clutter, so collapse
-    // it down to a one-line summary. "Choose files…" (header or hero)
+    // The import view has done its job — drop back to the explorer, leaving
+    // a one-line summary in the sidebar. "Choose files…" (header or hero)
     // still starts a fresh pick at any time.
+    currentResults = [];
     tickList.innerHTML = '';
-    tickList.style.display = 'none';
-    loadBtn.style.display = 'none';
-    loadEmptyState.style.display = '';
-    loadEmptyState.textContent = `${run.samples.size} sample${run.samples.size === 1 ? '' : 's'} loaded. Choose files above to load more.`;
+    loadEmptyState.textContent = `${run.samples.size} sample${run.samples.size === 1 ? '' : 's'} loaded. Choose files to load more.`;
+    setImportOpen(false);
 
     renderResults();
   }
@@ -423,6 +693,17 @@
       console.error(err);
       alert(`Failed to load: ${err.message}`);
     });
+  });
+
+  importCancelBtn.addEventListener('click', () => {
+    currentResults = [];
+    tickList.innerHTML = '';
+    if (run.samples.size > 0) {
+      loadEmptyState.textContent = `${run.samples.size} sample${run.samples.size === 1 ? '' : 's'} loaded. Choose files to load more.`;
+    } else {
+      loadEmptyState.innerHTML = loadEmptyStateDefault;
+    }
+    setImportOpen(false);
   });
 
   // ---- Results panel --------------------------------------------------
@@ -878,13 +1159,6 @@
     const card = el('div', { className: 'card summary-card' });
     card.appendChild(el('h3', { text: sample.displayName }));
 
-    if (sample.kind === 'generic') {
-      card.appendChild(
-        el('p', { text: `Generic format — ${sample.genericRows.length} rows, no taxonomic hierarchy available.` })
-      );
-      return card;
-    }
-
     const summary = computeSampleSummary(run.tree, sample.id, { filters: currentFilters() });
     const stats = el('dl', { className: 'stat-grid' });
     const addStat = (label, value) => {
@@ -919,15 +1193,11 @@
   }
 
   function getTableRows(sample) {
-    if (sample.kind === 'generic') {
-      return computeGenericTable(sample.genericRows, currentSearch);
-    }
     if (!currentRank) return [];
     return computeRankTable(run.tree, sample.id, currentRank, currentSearch, currentFilters());
   }
 
   function renderRankControls(sample) {
-    if (sample.kind === 'generic') return null;
     const ranks = computeAvailableRanks(run.tree, sample.id);
     if (!currentRank || !ranks.includes(currentRank)) currentRank = ranks[ranks.length - 1] || null;
 
@@ -1335,7 +1605,7 @@
   const METRIC_LABELS = { richness: 'Richness', shannon: 'Shannon index', simpson: 'Simpson’s Index of Diversity' };
 
   function renderOverviewDashboard() {
-    const included = orderedIncludedSamples().filter((s) => s.kind !== 'generic');
+    const included = orderedIncludedSamples();
     if (included.length < 2) return null;
 
     const groupNames = currentGroupNames();
@@ -1439,7 +1709,7 @@
     const tbody = el('tbody');
     const mean = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
     buckets.forEach((bucket) => {
-      const bucketSamples = bucket.ids.map((id) => run.samples.get(id)).filter((s) => s && s.kind !== 'generic');
+      const bucketSamples = bucket.ids.map((id) => run.samples.get(id)).filter(Boolean);
       if (bucketSamples.length === 0) return;
       const stats = bucketSamples.map((s) => computeSampleSummary(run.tree, s.id, { filters }));
       const rankPctsPerSample = bucketSamples.map((s, i) => rankResolutionPct(s.id, stats[i].totalReads));
@@ -1702,7 +1972,7 @@
   }
 
   function renderComparisonSection() {
-    const included = orderedIncludedSamples().filter((s) => s.kind !== 'generic');
+    const included = orderedIncludedSamples();
     if (included.length < 2) return null;
 
     const groupNames = currentGroupNames();
@@ -2047,15 +2317,12 @@
     metadataBody.innerHTML = '';
     metadataBody.appendChild(renderSampleMetadataSection());
 
+    syncMainView();
     if (run.samples.size === 0) {
-      explorerEl.style.display = 'none';
-      emptyEl.style.display = '';
       hTitle.textContent = '';
       hMeta.textContent = '';
       return;
     }
-    explorerEl.style.display = '';
-    emptyEl.style.display = 'none';
     hTitle.textContent = `${run.samples.size} sample${run.samples.size === 1 ? '' : 's'}`;
 
     explorerEl.innerHTML = '';
@@ -2082,28 +2349,24 @@
     if (selector) explorerEl.appendChild(selector);
     explorerEl.appendChild(renderSummaryCard(sample));
 
-    if (sample.kind !== 'generic') {
-      const sunburstSection = renderSunburstSection(sample);
-      if (sunburstSection) explorerEl.appendChild(sunburstSection);
+    const sunburstSection = renderSunburstSection(sample);
+    if (sunburstSection) explorerEl.appendChild(sunburstSection);
 
-      const sankeySection = renderSankeySection(sample);
-      if (sankeySection) explorerEl.appendChild(sankeySection);
+    const sankeySection = renderSankeySection(sample);
+    if (sankeySection) explorerEl.appendChild(sankeySection);
 
-      const rankControls = renderRankControls(sample);
-      if (rankControls) explorerEl.appendChild(rankControls);
-    }
+    const rankControls = renderRankControls(sample);
+    if (rankControls) explorerEl.appendChild(rankControls);
     explorerEl.appendChild(renderSearchBox());
     explorerEl.appendChild(el('div', { id: 'topn-chart-host' }));
     explorerEl.appendChild(el('div', { id: 'rank-table-host' }));
 
-    if (sample.kind !== 'generic') {
-      const csvBtn = el('button', { type: 'button', className: 'act', text: 'Export table as CSV' });
-      csvBtn.addEventListener('click', () => {
-        const csv = rankTableToCsv(getTableRows(sample), sample.id, sample.group);
-        downloadTextFile(`${sample.id}-rank-table.csv`, csv);
-      });
-      explorerEl.appendChild(el('div', { className: 'diagram-export-row' }, [csvBtn]));
-    }
+    const csvBtn = el('button', { type: 'button', className: 'act', text: 'Export table as CSV' });
+    csvBtn.addEventListener('click', () => {
+      const csv = rankTableToCsv(getTableRows(sample), sample.id, sample.group);
+      downloadTextFile(`${sample.id}-rank-table.csv`, csv);
+    });
+    explorerEl.appendChild(el('div', { className: 'diagram-export-row' }, [csvBtn]));
 
     renderTableAndChart();
   }

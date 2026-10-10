@@ -2,7 +2,7 @@
   'use strict';
 
 // Rank-by-rank breakdown table and Top-N bucketing for a single tree-backed
-// sample, plus the flat-row equivalent for generic-format samples.
+// sample.
 
 const { applyFilters, computeTreePruneMask } = typeof module !== 'undefined' && module.exports
   ? require('./filters')
@@ -109,24 +109,7 @@ function computeTopN(rows, n) {
   };
 }
 
-/**
- * Flat table for a generic-format sample (no hierarchy): name + abundance
- * rows, optionally filtered by search term. pctOfTotal is derived from the
- * sum of all row abundances since a generic report has no separate total.
- */
-function computeGenericTable(genericRows, searchTerm = '') {
-  const term = searchTerm.trim().toLowerCase();
-  const total = genericRows.reduce((sum, r) => sum + r.abundance, 0);
-  return genericRows
-    .filter((r) => !term || r.name.toLowerCase().includes(term))
-    .map((r) => ({
-      name: r.name,
-      cladeReads: r.abundance,
-      pctOfTotal: total > 0 ? (100 * r.abundance) / total : 0,
-    }));
-}
-
-const rankTableExports = { RANK_ORDER, computeAvailableRanks, computeRankTable, computeGenericTable, sortRows, computeTopN };
+const rankTableExports = { RANK_ORDER, computeAvailableRanks, computeRankTable, sortRows, computeTopN };
 if (typeof module !== 'undefined' && module.exports) module.exports = rankTableExports;
 if (typeof window !== 'undefined') {
   window.ClannEDNA = window.ClannEDNA || {};

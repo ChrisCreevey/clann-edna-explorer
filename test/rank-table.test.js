@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { test, report, assert } = require('./harness');
-const { computeAvailableRanks, computeRankTable, computeGenericTable, computeTopN } = require('../src/model/rank-table');
+const { computeAvailableRanks, computeRankTable, computeTopN } = require('../src/model/rank-table');
 const { TaxonomyTree } = require('../src/model/taxonomy-tree');
 const { parseBreport } = require('../src/parsers/breport');
 const { parseBracken } = require('../src/parsers/bracken');
@@ -63,16 +63,6 @@ test('top-N with N >= row count omits the "Other" bucket', () => {
   const { top, other } = computeTopN(rows, rows.length + 10);
   assert.strictEqual(top.length, rows.length);
   assert.strictEqual(other, null);
-});
-
-test('generic table computes percentage of total from row sum', () => {
-  const rows = [
-    { name: 'Escherichia coli', abundance: 75 },
-    { name: 'Bacillus subtilis', abundance: 25 },
-  ];
-  const table = computeGenericTable(rows);
-  assert.strictEqual(table[0].pctOfTotal, 75);
-  assert.strictEqual(table[1].pctOfTotal, 25);
 });
 
 test('bracken-only sample (leaf nodes at depth 0, no ancestor chain) still exposes species rank', () => {

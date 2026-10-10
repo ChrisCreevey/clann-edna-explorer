@@ -66,7 +66,8 @@ and [Clann Pangenome Explorer](https://chriscreevey.github.io/clann-pangenome-ex
 Point the file picker at the output files for a run — select every file
 at once (⇧-click, ⌘/Ctrl-click, or select-all). Files are identified by
 their **content**, not their filename or extension, so exports with
-generic names (e.g. from a Galaxy pipeline) still load correctly.
+generic names (e.g. from a Galaxy pipeline) still load correctly. The
+chosen files open in the main pane for review before anything loads.
 
 - **`.breport`** — a Kraken2/Bracken report: the full taxonomic
   hierarchy, one row per taxon, with clade and direct read counts at
@@ -87,8 +88,7 @@ generic names (e.g. from a Galaxy pipeline) still load correctly.
   Detected deterministically by its header (high confidence, no manual
   column mapping needed) and built into the same taxonomy tree as
   `.breport`, so it gets full rank views, sunburst, Sankey, and multi-sample
-  comparison — not the flat single-sample table the generic fallback below
-  is limited to. See
+  comparison. See
   [`examples/blast-explorer-nanopore-sample.lineage.tsv`](examples/blast-explorer-nanopore-sample.lineage.tsv),
   produced by [Clann BLAST Explorer](https://chriscreevey.github.io/clann-blast-explorer/)'s
   "Download eDNA Explorer sample" export (BLAST/DIAMOND hits for 5
@@ -120,20 +120,44 @@ feature table's own header. Features whose ID doesn't appear in
 `Unassigned`), are counted as unclassified reads for that sample rather
 than dropped.
 
-### Generic tab-delimited fallback
+### Other taxonomy tables (best effort)
 
-If a file isn't recognised as `.breport` or `.bracken`, it's tried as a
-generic tab-delimited table: at least two columns, one mostly numeric
-(read count or relative abundance) and one mostly text (taxon name),
-with an optional header row (detected automatically — a header is
-assumed if the first row's abundance cell isn't numeric). No taxonomic
-hierarchy is assumed, so a generic file only feeds the per-sample table
-and Top-N chart, not the sunburst or Sankey diagram.
+Any other tab-, comma- or semicolon-separated table that carries
+taxonomy can be imported through a column-mapping step. The tool
+suggests a role for every column — from its header name first, its
+contents second — and shows the suggestion as a table (column names, a
+role drop-down for each, and the first few rows) for you to confirm or
+change:
 
-If the name/abundance columns can't be auto-detected confidently, you
-can set the column indices manually before loading. This fallback is
-meant for other classifiers' plain-table output (e.g. a Kaiju summary or
-a MetaPhlAn abundance table) — see below for planned native support.
+- **Sample ID** — makes it a *long* table: one row per sample × taxon/OTU
+  (e.g. a BOLD metabarcoding export, `kaiju2table` across several files).
+- **Read count** — the count for that row. With no count column, each row
+  counts as one read (e.g. a per-read assignment table).
+- **Counts for one sample** — makes it a *wide* table: taxa as rows, one
+  count column per sample (e.g. a DADA2/mothur OTU/ASV table).
+- **Rank: superkingdom … species** — one column per rank, or instead
+- **Lineage string** — a single column such as `k__Bacteria;p__…`,
+  `k__…|p__…|s__…` (MetaPhlAn) or `Bacteria;Proteobacteria;…` (Kaiju).
+  Prefixed levels (`k__`, `p__`, SILVA `D_0__` …) map to their rank;
+  un-prefixed levels are read in order as superkingdom, phylum, class,
+  order, family, genus, species.
+- **Taxid: rank** — optional NCBI taxids for a rank; otherwise stable
+  synthetic IDs are made from the lineage names.
+
+With neither a Sample ID nor per-sample count columns, the whole file is
+one sample, named in the file list. Blank, `NA`, `unassigned`,
+`unclassified` and similar cells are treated as "not resolved at this
+rank"; a row with nothing resolved counts as unclassified. Options cover
+`Genus_species` underscores, species columns that hold only the epithet,
+and MetaPhlAn-style tables where every clade's total is its own row (only
+the most specific rows are counted). A live summary shows the layout,
+number of samples, rows used and the most specific rank each row
+reaches before you tick **Include**.
+
+Imported tables are built into the same taxonomy tree as the native
+formats, so they get the sunburst, Sankey and multi-sample comparison
+views. The confirmed mapping is recorded in each sample's provenance, and
+remembered in your browser for the next file with the same header row.
 
 ## Read-count scaling
 
@@ -180,10 +204,10 @@ sum of its (Bracken-corrected) species children in that case.
 
 ## Planned: native support for other classifiers
 
-Right now, anything other than Kraken2/Bracken/QIIME 2 goes through the
-generic tab-delimited fallback above. A future update will add native
-parsing (full taxonomic hierarchy, not just a flat table) for other
-common classifier outputs, likely including:
+Right now, anything other than Kraken2/Bracken/Lineage TSV/QIIME 2 goes
+through the column-mapping import above. A future update may add
+dedicated parsers (no mapping step) for other common classifier outputs,
+likely including:
 
 - **Kaiju** (`kaiju2table` summary output)
 - **Centrifuge**

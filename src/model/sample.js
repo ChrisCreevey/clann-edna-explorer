@@ -3,8 +3,8 @@
 
 // Builds a Sample from parsed file(s) and attaches its data into the
 // shared TaxonomyTree (see PLAN.md §2 data model). A sample may have a
-// .breport, a .bracken, both, or a single generic-format file — never more
-// than one of each, since pairing is by explicit user-assigned sample name
+// .breport, a .bracken, both, or a Lineage TSV — never more than one of
+// each, since pairing is by explicit user-assigned sample name
 // (see src/app.js), not filename guessing (brief: names aren't trustworthy).
 
 function guessSampleIdFromFilename(filename) {
@@ -16,25 +16,20 @@ function guessSampleIdFromFilename(filename) {
  * @param {object} inputs
  * @param {{text: string, filename: string}} [inputs.breport]
  * @param {{text: string, filename: string}} [inputs.bracken]
- * @param {{text: string, filename: string, mapping: {nameColumn: number, abundanceColumn: number}}} [inputs.generic]
  * @param {{text: string, filename: string, columnIndex?: object}} [inputs.lineageTsv]
  * @param {import('./taxonomy-tree').TaxonomyTree} tree
- * @param {object} parsers - { parseBreport, parseBracken, parseGeneric, parseLineageTsv, captureProvenance }
+ * @param {object} parsers - { parseBreport, parseBracken, parseLineageTsv, captureProvenance }
  */
 function buildSample(sampleId, inputs, tree, parsers) {
-  const { parseBreport, parseBracken, parseGeneric, parseLineageTsv, captureProvenance } = parsers;
-
-  const isGeneric = Boolean(inputs.generic) && !inputs.breport && !inputs.bracken && !inputs.lineageTsv;
+  const { parseBreport, parseBracken, parseLineageTsv, captureProvenance } = parsers;
 
   const sample = {
     id: sampleId,
     displayName: sampleId,
-    kind: isGeneric ? 'generic' : 'tree',
     hasBreport: Boolean(inputs.breport),
     hasBracken: Boolean(inputs.bracken),
     hasLineageTsv: Boolean(inputs.lineageTsv),
     provenance: null,
-    genericRows: null,
     sourceFiles: [],
     group: null, // display-layer only — see src/model/groups.js; null = unassigned
     groupSource: null, // 'manual' | 'metadata' | null — manual always wins (Phase 8: metadata pre-population)
@@ -58,12 +53,6 @@ function buildSample(sampleId, inputs, tree, parsers) {
   if (inputs.lineageTsv) {
     parseLineageTsv(inputs.lineageTsv.text, tree, sampleId, inputs.lineageTsv.columnIndex);
     sample.sourceFiles.push(inputs.lineageTsv.filename);
-  }
-
-  if (inputs.generic) {
-    const { rows } = parseGeneric(inputs.generic.text, inputs.generic.mapping);
-    sample.genericRows = rows;
-    sample.sourceFiles.push(inputs.generic.filename);
   }
 
   return sample;

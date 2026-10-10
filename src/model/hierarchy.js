@@ -32,7 +32,7 @@ const { computeTreePruneMask } = typeof module !== 'undefined' && module.exports
  *   with the rank table and comparison charts, which read through the same
  *   filters.
  * @returns {object|null} nested root node, or null if the sample has no
- *   hierarchy (e.g. a bracken-only or generic sample)
+ *   hierarchy (e.g. a bracken-only sample)
  */
 function buildHierarchyTree(tree, sampleId, filters = null) {
   const byIndex = new Map(); // treeIndex -> hierarchy node

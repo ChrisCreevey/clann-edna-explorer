@@ -41,10 +41,6 @@ function isInteger(value) {
   return /^-?\d+$/.test(value.trim());
 }
 
-function isNumeric(value) {
-  return value.trim() !== '' && Number.isFinite(Number(value));
-}
-
 /**
  * Try matching the .bracken shape: 7 tab columns, literal header row.
  */
@@ -148,64 +144,32 @@ function sniffQiimeBiomTsv(lines) {
   return { format: 'qiime-biom-tsv', confidence: 'high', sampleIds: cols.slice(1).map((c) => c.trim()) };
 }
 
+const tableImport =
+  typeof module !== 'undefined' && module.exports ? require('./table-import') : window.ClannEDNA.tableImport;
+
 /**
- * Best-effort generic tab-delimited fallback: needs >=2 columns, a
- * consistently numeric candidate abundance column, and a consistently
- * non-numeric candidate taxon-name column. Always returned as "unconfirmed"
- * confidence so the caller can require manual confirmation before treating
- * it as selected in a tick-list.
+ * Best-effort fallback for any other delimited table (tab, comma or
+ * semicolon): guess a role for every column (see table-import.js). Always
+ * "unconfirmed" — the guess is shown to the user to confirm or change
+ * before anything loads, never silently accepted.
  */
-function sniffGeneric(lines) {
-  if (lines.length === 0) return null;
-  const rows = lines.map((l) => l.split('\t')).filter((r) => r.length >= 2);
-  if (rows.length === 0) return null;
-
-  const colCount = Math.min(...rows.map((r) => r.length));
-  if (colCount < 2) return null;
-
-  const numericScore = new Array(colCount).fill(0);
-  const textScore = new Array(colCount).fill(0);
-  for (const row of rows) {
-    for (let c = 0; c < colCount; c++) {
-      if (isNumeric(row[c])) numericScore[c]++;
-      else if (row[c].trim() !== '') textScore[c]++;
-    }
-  }
-
-  let abundanceCol = -1;
-  let maxNumeric = 0;
-  for (let c = 0; c < colCount; c++) {
-    if (numericScore[c] > maxNumeric) {
-      maxNumeric = numericScore[c];
-      abundanceCol = c;
-    }
-  }
-
-  let nameCol = -1;
-  let maxText = 0;
-  for (let c = 0; c < colCount; c++) {
-    if (c === abundanceCol) continue;
-    if (textScore[c] > maxText) {
-      maxText = textScore[c];
-      nameCol = c;
-    }
-  }
-
-  if (abundanceCol === -1 || nameCol === -1) return null;
-  if (maxNumeric / rows.length < 0.7 || maxText / rows.length < 0.7) return null;
-
+function sniffGeneric(text) {
+  const table = tableImport.readTable(text);
+  if (!table || table.header.length < 2) return null;
+  const mapping = tableImport.guessMapping(table);
   return {
     format: 'generic',
     confidence: 'unconfirmed',
-    columns: colCount,
-    candidateAbundanceColumn: abundanceCol,
-    candidateNameColumn: nameCol,
+    header: table.header,
+    signature: tableImport.headerSignature(table),
+    mapping,
+    mappingErrors: tableImport.validateMapping(mapping),
   };
 }
 
 /**
  * Detect the format of a text file's content. Returns a result object with
- * `format` ("bracken" | "breport" | "lineage-tsv" | "generic" | "unknown"), `confidence`
+ * `format` ("bracken" | "breport" | "lineage-tsv" | "qiime-*" | "generic" | "unknown"), `confidence`
  * ("high" | "unconfirmed" | "none"), and a human-readable `reason` when
  * detection failed or was unconfirmed.
  */
@@ -230,19 +194,18 @@ function sniffFormat(text) {
   const qiimeBiomTsv = sniffQiimeBiomTsv(lines);
   if (qiimeBiomTsv) return qiimeBiomTsv;
 
-  const generic = sniffGeneric(lines);
+  const generic = sniffGeneric(text);
   if (generic) {
     return {
       ...generic,
-      reason:
-        'structurally tab-delimited with a plausible abundance/name column pair, but did not match the .bracken or .breport shape — confirm column mapping manually',
+      reason: 'not a native format — check the suggested column mapping before loading',
     };
   }
 
   return {
     format: 'unknown',
     confidence: 'none',
-    reason: 'no tab-delimited numeric columns found in the first ' + SNIFF_LINE_LIMIT + ' lines',
+    reason: 'no tab-, comma- or semicolon-delimited columns found',
   };
 }
 

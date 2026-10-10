@@ -113,12 +113,11 @@ test('computeSampleSummary reports correct classified/unclassified split for a L
   assert.strictEqual(summary.totalReads, 92);
 });
 
-test('sample.kind is "tree" for a Lineage-TSV-only sample, not "generic"', () => {
+test('buildSample marks a Lineage-TSV-only sample as such', () => {
   const tree = new TaxonomyTree();
   const parsers = {
     parseBreport: () => {},
     parseBracken: () => {},
-    parseGeneric: () => ({ rows: [] }),
     parseLineageTsv,
     captureProvenance: () => null,
   };
@@ -128,16 +127,14 @@ test('sample.kind is "tree" for a Lineage-TSV-only sample, not "generic"', () =>
     tree,
     parsers
   );
-  assert.strictEqual(sample.kind, 'tree');
   assert.strictEqual(sample.hasLineageTsv, true);
 });
 
-test('a Lineage-TSV sample is included in multi-sample comparison output (not filtered as generic)', () => {
+test('a Lineage-TSV sample is included in multi-sample comparison output', () => {
   const tree = new TaxonomyTree();
   const parsers = {
     parseBreport: () => {},
     parseBracken: () => {},
-    parseGeneric: () => ({ rows: [] }),
     parseLineageTsv,
     captureProvenance: () => null,
   };
@@ -147,7 +144,6 @@ test('a Lineage-TSV sample is included in multi-sample comparison output (not fi
     tree,
     parsers
   );
-  assert.notStrictEqual(sample.kind, 'generic');
   const matrix = buildAbundanceMatrix(tree, [sample.id], 'S', {});
   assert.ok(matrix.taxa.length > 0, 'expected species-level rows for the lineage-tsv sample');
 });
